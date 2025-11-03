@@ -44,8 +44,8 @@ export const router = createBrowserRouter([
         element: <Stock />,
       },
       {
-        path: "branches",
-        element: <div>Branches Page - Implement this component</div>,
+        path: "dashboard",
+        element: <div>Dashboard</div>,
       },
     ],
   },

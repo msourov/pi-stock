@@ -1,23 +1,20 @@
 import { useEffect, useState } from "react";
 import {
   TextInput,
-  NumberInput,
-  Select,
   Button,
   Table,
   Group,
   Stack,
   Title,
   Loader,
-  Textarea,
-  Notification,
-  Modal,
   Card,
   Grid,
   Badge,
   ActionIcon,
   Text,
   Box,
+  Select,
+  Tooltip,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useForm } from "@mantine/form";
@@ -29,22 +26,30 @@ import {
   IconTrash,
   IconSearch,
   IconRefresh,
+  IconPackage,
+  IconTrendingUp,
+  IconClock,
+  IconDatabase,
+  IconDownload,
+  IconFilter,
 } from "@tabler/icons-react";
 import type { CreateStockPayload, Stock } from "./type";
 import { useAuth } from "../../AuthProvider";
+import { notifications } from "@mantine/notifications";
+import CreateStockModal from "./components/CreateStockModal";
 
 const Stock = () => {
   const [stocks, setStocks] = useState<Stock[]>([]);
-  const [productOptions, setProductOptions] =
-    useState<{ uid: string; name: string }[]>();
+  const [productOptions, setProductOptions] = useState<
+    { uid: string; name: string }[]
+  >([]);
   const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
   const [loadingTable, setLoadingTable] = useState(false);
+  const [filterLoading, setFilterLoading] = useState(false);
   const [, setSubmitting] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [notif, setNotif] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
   const { logout } = useAuth();
 
@@ -53,7 +58,8 @@ const Stock = () => {
     { value: "branch-2", label: "Downtown Branch" },
     { value: "branch-3", label: "West Side Branch" },
   ]);
-  const companyId = "61651c07-0fe1-4cb7-9d03-b918a613a5c9";
+  const user = JSON.parse(localStorage.getItem("user") || "");
+  const companyId = user.company_id;
   const token = localStorage.getItem("token");
   const form = useForm<CreateStockPayload>({
     initialValues: {
@@ -74,7 +80,6 @@ const Stock = () => {
 
   const fetchStocks = async () => {
     setLoadingTable(true);
-
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/stock/all-full`,
@@ -103,6 +108,111 @@ const Stock = () => {
       setFilteredStocks([]);
     } finally {
       setLoadingTable(false);
+    }
+  };
+
+  const fetchStocksByProduct = async (productId: string, branchId?: string) => {
+    setFilterLoading(true);
+    try {
+      let url = `${
+        import.meta.env.VITE_API_BASE_URL
+      }/stock/stock-by-product/${productId}?page=1&page_size=100`;
+
+      if (branchId) {
+        url += `&branch_id=${branchId}`;
+      }
+
+      const res = await fetch(url, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setFilteredStocks(data?.data || []);
+      } else if (res.status === 401) {
+        logout();
+      } else {
+        console.error("Filter fetch failed:", res.status);
+        setFilteredStocks([]);
+      }
+    } catch (error) {
+      console.error("Error filtering stocks:", error);
+      setFilteredStocks([]);
+    } finally {
+      setFilterLoading(false);
+    }
+  };
+
+  const handleFilter = () => {
+    if (selectedProduct) {
+      fetchStocksByProduct(selectedProduct, selectedBranch ?? undefined);
+    } else {
+      // If no product selected, show all stocks
+      setFilteredStocks(stocks);
+    }
+  };
+
+  const handleResetFilter = () => {
+    setSelectedProduct(null);
+    setSelectedBranch(null);
+    setFilteredStocks(stocks);
+  };
+
+  const handleDownloadExcel = async () => {
+    const queryParams = new URLSearchParams();
+    if (companyId !== undefined && companyId !== null) {
+      queryParams.append("company_id", String(companyId));
+    }
+    if (selectedProduct) {
+      queryParams.append("product_id", selectedProduct);
+    }
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_BASE_URL
+        }/stock/all-full/export-excel?${queryParams}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        }
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = url;
+        a.download = `stock-report-${
+          new Date().toISOString().split("T")[0]
+        }.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        notifications.show({
+          title: "Success",
+          message: "Excel report downloaded successfully",
+          color: "green",
+        });
+      } else {
+        notifications.show({
+          title: "Error",
+          message: "Failed to download Excel report",
+          color: "red",
+        });
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      notifications.show({
+        title: "Error",
+        message: "Failed to download Excel report",
+        color: "red",
+      });
     }
   };
 
@@ -135,8 +245,6 @@ const Stock = () => {
     fetchProductionOptions();
   }, [opened]);
 
-  console.log(productOptions);
-
   // Search functionality
   useEffect(() => {
     if (searchTerm) {
@@ -154,7 +262,7 @@ const Stock = () => {
     } else {
       setFilteredStocks(stocks);
     }
-  }, [searchTerm, stocks]);
+  }, [searchTerm, stocks, selectedProduct]);
 
   const handleSubmit = async (values: CreateStockPayload) => {
     const token = localStorage.getItem("token");
@@ -165,42 +273,49 @@ const Stock = () => {
         {
           method: "POST",
           headers: {
+            "Content-Type": "application/json",
             Authorization: token ? `Bearer ${token}` : "",
           },
           body: JSON.stringify(values),
         }
       );
+      const result = await res.json();
 
-      if (res.ok) {
-        setNotif({ type: "success", message: "Stock created successfully!" });
+      console.log(result, "result");
+
+      if (result.success) {
+        notifications.show({
+          title: "Success",
+          message: result?.message || "Category created successfully!",
+          icon: <IconCheck />,
+          color: "teal",
+        });
+
         form.reset();
         close();
         fetchStocks();
       } else if (res.status === 401) {
         logout();
       } else {
-        const err = await res.text();
-        setNotif({ type: "error", message: err || "Failed to create stock" });
+        notifications.show({
+          title: "Error",
+          message: result?.message || "Failed to create category",
+          icon: <IconX />,
+          color: "red",
+        });
       }
-    } catch {
-      setNotif({ type: "error", message: "Network error" });
+    } catch (err) {
+      console.error("Create category error:", err);
+      notifications.show({
+        title: "Something went wrong!",
+        message: "Please check your connection",
+        icon: <IconX />,
+        color: "red",
+      });
     } finally {
       setSubmitting(false);
     }
   };
-
-  // const getStatusColor = (status: string) => {
-  //   switch (status) {
-  //     case "approved":
-  //       return "green";
-  //     case "pending":
-  //       return "yellow";
-  //     case "rejected":
-  //       return "red";
-  //     default:
-  //       return "gray";
-  //   }
-  // };
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -215,105 +330,190 @@ const Stock = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
+  const statCards = [
+    {
+      label: "Total Products",
+      value: new Set(stocks.map((s) => s.product_id)).size,
+      color: "#4299e1",
+      icon: <IconPackage size={20} color="#4299e1" />,
+    },
+    {
+      label: "Total Stock Value",
+      value:
+        "$" +
+        stocks
+          .reduce((sum, s) => sum + s.price * s.quantity, 0)
+          .toLocaleString(),
+      color: "#48bb78",
+      icon: <IconTrendingUp size={20} color="#48bb78" />,
+    },
+    {
+      label: "Pending Movements",
+      value: stocks.filter((s) => s.movement_status === "pending").length,
+      color: "#ed8936",
+      icon: <IconClock size={20} color="#ed8936" />,
+    },
+    {
+      label: "Total Records",
+      value: stocks.length,
+      color: "#9f7aea",
+      icon: <IconDatabase size={20} color="#9f7aea" />,
+    },
+  ];
 
   return (
-    <Stack p="md" gap="lg">
-      <Group justify="space-between">
-        <div>
-          <Title order={4} fw={500} c="blue">
-            Stock Management
-          </Title>
-          <Text c="dimmed" size="sm">
-            Manage your inventory and stock movements
-          </Text>
-        </div>
-        <Button
-          leftSection={<IconPlus size={18} />}
-          onClick={open}
-          size="sm"
-          radius="md"
-        >
-          Add Stock
-        </Button>
-      </Group>
-
-      {notif && (
-        <Notification
-          icon={notif.type === "success" ? <IconCheck /> : <IconX />}
-          color={notif.type === "success" ? "teal" : "red"}
-          onClose={() => setNotif(null)}
-          title={notif.type === "success" ? "Success" : "Error"}
-          withBorder
-        >
-          {notif.message}
-        </Notification>
-      )}
-
-      {/* Stats Cards */}
-      <Grid>
-        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
-          <Card withBorder padding="lg" radius="md">
-            <Text fz="sm" c="dimmed" fw={500}>
-              Total Products
+    <Stack p="xs" gap="sm">
+      {/* Header */}
+      <Card
+        withBorder
+        shadow="xs"
+        radius="md"
+        p="sm"
+        style={{
+          background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+          border: "1px solid #e2e8f0",
+        }}
+      >
+        <Group justify="space-between">
+          <div>
+            <Title order={5} fw={600} c="indigo">
+              Stock Management
+            </Title>
+            <Text c="dimmed" fz="xs" mt={2}>
+              Manage your inventory and stock movements
             </Text>
-            <Text fz="xl" fw={700}>
-              {new Set(stocks.map((s) => s.product_id)).size}
-            </Text>
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
-          <Card withBorder padding="lg" radius="md">
-            <Text fz="sm" c="dimmed" fw={500}>
-              Total Stock Value
-            </Text>
-            <Text fz="xl" fw={700}>
-              {formatCurrency(
-                stocks.reduce(
-                  (sum, stock) => sum + stock.price * stock.quantity,
-                  0
-                )
-              )}
-            </Text>
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
-          <Card withBorder padding="lg" radius="md">
-            <Text fz="sm" c="dimmed" fw={500}>
-              Pending Movements
-            </Text>
-            <Text fz="xl" fw={700}>
-              {stocks.filter((s) => s.movement_status === "pending").length}
-            </Text>
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
-          <Card withBorder padding="lg" radius="md">
-            <Text fz="sm" c="dimmed" fw={500}>
-              Total Records
-            </Text>
-            <Text fz="xl" fw={700}>
-              {stocks.length}
-            </Text>
-          </Card>
-        </Grid.Col>
+          </div>
+          <Button
+            leftSection={<IconPlus size={18} />}
+            onClick={open}
+            size="xs"
+            radius="sm"
+            color="purple"
+          >
+            Add Stock
+          </Button>
+        </Group>
+      </Card>
+      {/* Stats */}
+      <Grid gutter="sm">
+        {statCards.map((stat) => (
+          <Grid.Col key={stat.label} span={{ base: 12, sm: 6, lg: 3 }}>
+            <Card
+              withBorder
+              p="sm"
+              radius="sm"
+              style={{
+                borderLeft: `3px solid ${stat.color}`,
+                background: "white",
+              }}
+            >
+              <Group gap={6} align="flex-start">
+                <Box
+                  p={6}
+                  style={{
+                    background: `${stat.color}20`,
+                    borderRadius: 6,
+                  }}
+                >
+                  {stat.icon}
+                </Box>
+                <div>
+                  <Text fz="xs" c="dimmed" fw={500}>
+                    {stat.label}
+                  </Text>
+                  <Text fz="lg" fw={700}>
+                    {stat.value}
+                  </Text>
+                </div>
+              </Group>
+            </Card>
+          </Grid.Col>
+        ))}
       </Grid>
 
-      {/* Table Section */}
-      <Card withBorder shadow="sm" radius="md">
-        <Group justify="end" mb="md">
+      {/* Filters */}
+      <Card withBorder radius="md" p="sm" style={{ background: "white" }}>
+        <Group gap="sm" align="flex-end">
+          <Select
+            label="Product"
+            placeholder="Select product"
+            data={productOptions.map((p) => ({ value: p.uid, label: p.name }))}
+            value={selectedProduct}
+            onChange={(value) => setSelectedProduct(value || "")}
+            size="xs"
+            style={{ minWidth: 150 }}
+            clearable
+          />
+          <Select
+            label="Branch"
+            placeholder="All branches"
+            data={branches}
+            value={selectedBranch}
+            onChange={(value) => setSelectedBranch(value || "")}
+            size="xs"
+            style={{ minWidth: 140 }}
+            clearable
+          />
+          <Button
+            size="xs"
+            onClick={handleFilter}
+            loading={filterLoading}
+            leftSection={<IconFilter size={14} />}
+          >
+            Filter
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            onClick={handleResetFilter}
+            leftSection={<IconX size={14} />}
+            disabled={!selectedProduct && !selectedBranch}
+          >
+            Reset
+          </Button>
+          <Box style={{ flex: 1 }} />
+          <Tooltip
+            label="Please select a product."
+            disabled={!!selectedProduct}
+            withArrow
+          >
+            <div>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={handleDownloadExcel}
+                leftSection={<IconDownload size={14} />}
+                disabled={!selectedProduct}
+              >
+                Export Excel
+              </Button>
+            </div>
+          </Tooltip>
+          {/* <Button
+            size="xs"
+            variant="outline"
+            onClick={handleDownloadExcel}
+            leftSection={<IconDownload size={14} />}
+          >
+            Export Excel
+          </Button> */}
+        </Group>
+      </Card>
+
+      {/* Table */}
+      <Card withBorder radius="md" style={{ background: "white" }}>
+        <Group justify="space-between" mb="xs" px="xs" pb={4}>
+          <Title order={5} c="dark.4">
+            Stock Records {selectedProduct && "(Filtered)"}
+          </Title>
           <Group>
             <TextInput
               placeholder="Search references, types..."
               leftSection={<IconSearch size={16} />}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              size="sm"
+              size="xs"
+              style={{ width: 250 }}
             />
             <Button
               variant="light"
@@ -327,185 +527,118 @@ const Stock = () => {
           </Group>
         </Group>
 
-        {loadingTable ? (
-          <Box py="xl" ta="center">
-            <Loader size="lg" />
-            <Text mt="md">Loading stock data...</Text>
+        {loadingTable || filterLoading ? (
+          <Box py="md" ta="center">
+            <Loader size="sm" />
+            <Text mt="xs" c="dimmed" fz="sm">
+              {filterLoading ? "Filtering stocks..." : "Loading stock data..."}
+            </Text>
           </Box>
         ) : (
-          <Table striped highlightOnHover withTableBorder>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Product</Table.Th>
-                <Table.Th>Quantity</Table.Th>
-                <Table.Th>Price</Table.Th>
-                <Table.Th>Type</Table.Th>
-                {/* <Table.Th>Status</Table.Th> */}
-                <Table.Th>Reference</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filteredStocks.length === 0 ? (
+          <Box px="xs" pb="xs">
+            <Table
+              striped
+              highlightOnHover
+              withTableBorder
+              verticalSpacing="xs"
+              horizontalSpacing="sm"
+            >
+              <Table.Thead>
                 <Table.Tr>
-                  <Table.Td colSpan={7} py="xl" ta="center">
-                    <Box>
-                      <IconSearch size={48} color="gray" />
-                      <Text mt="sm" c="dimmed">
-                        {searchTerm
-                          ? "No matching records found"
-                          : "No stock data available"}
-                      </Text>
-                    </Box>
-                  </Table.Td>
+                  <Table.Th>Product</Table.Th>
+                  <Table.Th>Quantity</Table.Th>
+                  <Table.Th>Price</Table.Th>
+                  <Table.Th>Type</Table.Th>
+                  <Table.Th>Reference</Table.Th>
+                  <Table.Th ta="center">Actions</Table.Th>
                 </Table.Tr>
-              ) : (
-                filteredStocks.map((s) => (
-                  <Table.Tr key={s.uid}>
-                    <Table.Td>
-                      <Text fw={500}>{s.product_name}</Text>
-                      {s.description && (
-                        <Text fz="xs" c="dimmed" lineClamp={1}>
-                          {s.description}
+              </Table.Thead>
+
+              <Table.Tbody>
+                {filteredStocks.length ? (
+                  filteredStocks.map((s) => (
+                    <Table.Tr key={s.uid}>
+                      <Table.Td>
+                        <Text fw={600} fz="sm">
+                          {s.product_name}
                         </Text>
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge
-                        variant="light"
-                        color={s.quantity > 0 ? "blue" : "red"}
-                      >
-                        {s.quantity}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>{formatCurrency(s.price)}</Table.Td>
-                    <Table.Td>
-                      <Badge color={getTypeColor(s.movement_type)}>
-                        {s.movement_type}
-                      </Badge>
-                    </Table.Td>
-                    {/* <Table.Td>
-                      <Badge
-                        color={getStatusColor(s.movement_status || "pending")}
-                      >
-                        {s.movement_status || "pending"}
-                      </Badge>
-                    </Table.Td> */}
-                    <Table.Td>
-                      <Text size="sm">{s.reference || "-"}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        <ActionIcon variant="subtle" color="blue" size="sm">
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="subtle" color="red" size="sm">
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
+                        {s.description && (
+                          <Text fz="xs" c="dimmed" lineClamp={1}>
+                            {s.description}
+                          </Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge
+                          variant="light"
+                          color={s.quantity > 0 ? "blue" : "red"}
+                        >
+                          {s.quantity}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td fw={500}>${s.price}</Table.Td>
+                      <Table.Td>
+                        <Badge
+                          color={getTypeColor(s.movement_type)}
+                          variant="filled"
+                        >
+                          {s.movement_type}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>{s.reference || "-"}</Table.Td>
+                      <Table.Td ta="center">
+                        <Group gap={4} justify="center">
+                          <ActionIcon
+                            variant="subtle"
+                            color="blue"
+                            size="sm"
+                            radius="sm"
+                          >
+                            <IconEdit size={14} />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            size="sm"
+                            radius="sm"
+                          >
+                            <IconTrash size={14} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))
+                ) : (
+                  <Table.Tr>
+                    <Table.Td colSpan={6} py="lg" ta="center">
+                      <Box>
+                        <IconSearch size={36} color="gray" />
+                        <Text c="dimmed" fz="sm" mt={4}>
+                          {selectedProduct
+                            ? "No stock records found for selected filter"
+                            : searchTerm
+                            ? "No matching records found"
+                            : "No stock data available"}
+                        </Text>
+                      </Box>
                     </Table.Td>
                   </Table.Tr>
-                ))
-              )}
-            </Table.Tbody>
-          </Table>
+                )}
+              </Table.Tbody>
+            </Table>
+          </Box>
         )}
       </Card>
 
       {/* Create Stock Modal */}
-      <Modal
+      <CreateStockModal
         opened={opened}
-        onClose={close}
-        centered
-        size="xl"
-        padding="xl"
-        title={
-          <Title order={4} c="gray">
-            Add New Stock
-          </Title>
-        }
-        overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
-      >
-        <form onSubmit={form.onSubmit(handleSubmit)}>
-          <Grid>
-            <Grid.Col span={12}>
-              <Select
-                label="Branch"
-                placeholder="Select branch"
-                data={branches}
-                {...form.getInputProps("branch_id")}
-                withAsterisk
-              />
-            </Grid.Col>
-
-            {/* Product ID */}
-            <Grid.Col span={12}>
-              <Select
-                label="Product"
-                placeholder="Select a product"
-                data={
-                  productOptions?.map((p: { uid: string; name: string }) => ({
-                    value: p.uid,
-                    label: p.name,
-                  })) || []
-                }
-                {...form.getInputProps("product_id")}
-                withAsterisk
-                searchable
-                clearable
-                nothingFoundMessage="No products found"
-              />
-            </Grid.Col>
-
-            {/* Movement Type */}
-            <Grid.Col span={12}>
-              <Select
-                label="Movement Type"
-                data={[
-                  { value: "opening", label: "Opening Stock" },
-                  { value: "in", label: "Stock In" },
-                  { value: "out", label: "Stock Out" },
-                ]}
-                {...form.getInputProps("movement_type")}
-                withAsterisk
-              />
-            </Grid.Col>
-
-            {/* Quantity */}
-            <Grid.Col span={12}>
-              <NumberInput
-                label="Quantity"
-                min={0}
-                {...form.getInputProps("quantity")}
-                withAsterisk
-              />
-            </Grid.Col>
-
-            {/* Reference - optional */}
-            <Grid.Col span={12}>
-              <TextInput
-                label="Reference"
-                placeholder="Enter reference"
-                {...form.getInputProps("reference")}
-              />
-            </Grid.Col>
-
-            {/* Description - optional */}
-            <Grid.Col span={12}>
-              <Textarea
-                label="Description"
-                placeholder="Enter description"
-                rows={3}
-                {...form.getInputProps("description")}
-              />
-            </Grid.Col>
-          </Grid>
-
-          <Group ta="right" mt="md">
-            <Button type="submit">Create Stock</Button>
-          </Group>
-        </form>
-      </Modal>
+        close={close}
+        branches={branches}
+        form={form}
+        productOptions={productOptions}
+        handleSubmit={handleSubmit}
+      />
     </Stack>
   );
 };

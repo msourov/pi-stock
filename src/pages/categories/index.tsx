@@ -14,11 +14,14 @@ import {
   TextInput,
   Select,
   Stack,
+  Grid,
 } from "@mantine/core";
 import {
+  IconBuilding,
   IconCategory,
   IconCheck,
   IconEdit,
+  IconInfoCircle,
   IconPlus,
   IconRefresh,
   IconTrash,
@@ -220,153 +223,272 @@ export default function Categories() {
   };
 
   return (
-    <Card withBorder shadow="sm" radius="md">
-      <Group justify="space-between" mb="md">
-        <Title order={4}>Product Categories</Title>
-        <Group>
-          <Button leftSection={<IconPlus size={16} />} onClick={open} size="sm">
+    <Stack p="xs" gap="sm">
+      {/* Header Section */}
+      <Card
+        withBorder
+        shadow="xs"
+        radius="md"
+        p="sm"
+        style={{
+          background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+          border: "1px solid #e2e8f0",
+        }}
+      >
+        <Group justify="space-between" align="center">
+          <div>
+            <Title order={5} fw={600} c="indigo">
+              Product Categories
+            </Title>
+            <Text c="dimmed" fz="xs" mt={2}>
+              Organize your products with categories
+            </Text>
+          </div>
+          <Button
+            leftSection={<IconPlus size={14} />}
+            onClick={open}
+            size="xs"
+            radius="sm"
+            color="purple"
+          >
             Add Category
           </Button>
+        </Group>
+      </Card>
+
+      {/* Stats Cards */}
+      <Grid gutter="sm">
+        {[
+          {
+            color: "#4299e1",
+            label: "Total Categories",
+            value: categories.length,
+            icon: <IconCategory size={16} color="#4299e1" />,
+          },
+          {
+            color: "#48bb78",
+            label: "Active Categories",
+            value: categories.filter((c) => c.active).length,
+            icon: <IconCheck size={16} color="#48bb78" />,
+          },
+          {
+            color: "#ed8936",
+            label: "Branches Used",
+            value: new Set(categories.flatMap((c) => c.branch_id)).size,
+            icon: <IconBuilding size={16} color="#ed8936" />,
+          },
+          {
+            color: "#9f7aea",
+            label: "With Additional Info",
+            value: categories.filter((c) => c.info1).length,
+            icon: <IconInfoCircle size={16} color="#9f7aea" />,
+          },
+        ].map(({ color, label, value, icon }, index) => (
+          <Grid.Col key={index} span={{ base: 12, sm: 6, lg: 3 }}>
+            <Card
+              withBorder
+              p="sm"
+              radius="sm"
+              style={{
+                borderLeft: `3px solid ${color}`,
+                background: "white",
+              }}
+            >
+              <Group gap={6} align="flex-start">
+                <Box
+                  p={6}
+                  style={{
+                    background: `${color}1A`,
+                    borderRadius: 6,
+                  }}
+                >
+                  {icon}
+                </Box>
+                <div style={{ flex: 1 }}>
+                  <Text fz="xs" c="dimmed" fw={500}>
+                    {label}
+                  </Text>
+                  <Text fz="lg" fw={700} c="dark.4">
+                    {value}
+                  </Text>
+                </div>
+              </Group>
+            </Card>
+          </Grid.Col>
+        ))}
+      </Grid>
+
+      {/* Table Section */}
+      <Card withBorder radius="md" style={{ background: "white" }}>
+        <Group justify="space-between" mb="xs" px="xs" pb={4}>
+          <Title order={5} c="dark.4">
+            Category List
+          </Title>
           <Button
             variant="light"
-            leftSection={<IconRefresh size={16} />}
+            leftSection={<IconRefresh size={14} />}
             onClick={fetchCategories}
             disabled={loading}
-            size="sm"
+            size="xs"
           >
             Refresh
           </Button>
         </Group>
-      </Group>
 
-      {loading ? (
-        <Box py="xl" ta="center">
-          <Loader size="lg" />
-          <Text mt="md">Loading categories...</Text>
-        </Box>
-      ) : (
-        <Table striped highlightOnHover withTableBorder>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Name</Table.Th>
-              <Table.Th>Branch</Table.Th>
-              <Table.Th>Additional Info</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-
-          <Table.Tbody>
-            {categories.length === 0 ? (
-              <Table.Tr>
-                <Table.Td colSpan={5} py="xl" ta="center">
-                  <Box>
-                    <IconCategory size={48} color="gray" />
-                    <Text mt="sm" c="dimmed">
-                      No categories available
-                    </Text>
-                  </Box>
-                </Table.Td>
-              </Table.Tr>
-            ) : (
-              categories.map((category) => (
-                <Table.Tr key={category.id}>
-                  <Table.Td>
-                    <Text fw={500}>{category.name}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge variant="light" color="blue">
-                      {category.branch_id && category.branch_id.length > 0
-                        ? getBranchLabel(category.branch_id[0])
-                        : "No branch"}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c="dimmed">
-                      {category.info1 || "-"}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge color={category.active ? "green" : "red"}>
-                      {category.active ? "Active" : "Inactive"}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      <ActionIcon variant="subtle" color="blue" size="sm">
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        size="sm"
-                        loading={deletingId === category.uid}
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Are you sure you want to delete category "${category.name}"?`
-                            )
-                          ) {
-                            handleDeleteCategory(category.uid);
-                          }
-                        }}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Group>
-                  </Table.Td>
+        {loading ? (
+          <Box py="md" ta="center">
+            <Loader size="sm" />
+            <Text mt="xs" c="dimmed" fz="sm">
+              Loading categories...
+            </Text>
+          </Box>
+        ) : (
+          <Box px="xs" pb="xs">
+            <Table
+              striped
+              highlightOnHover
+              withTableBorder
+              verticalSpacing="xs"
+              horizontalSpacing="sm"
+            >
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Name</Table.Th>
+                  <Table.Th>Branch</Table.Th>
+                  <Table.Th>Additional Info</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  <Table.Th style={{ textAlign: "center" }}>Actions</Table.Th>
                 </Table.Tr>
-              ))
-            )}
-          </Table.Tbody>
-        </Table>
-      )}
+              </Table.Thead>
+              <Table.Tbody>
+                {categories.length === 0 ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={5} py="lg" ta="center">
+                      <Box>
+                        <IconCategory size={36} color="gray" />
+                        <Text mt={4} c="dimmed" fz="sm">
+                          No categories available
+                        </Text>
+                        <Text c="dimmed" fz="xs" mt={2}>
+                          Get started by creating your first category
+                        </Text>
+                      </Box>
+                    </Table.Td>
+                  </Table.Tr>
+                ) : (
+                  categories.map((category) => (
+                    <Table.Tr key={category.id}>
+                      <Table.Td>
+                        <Text fw={600} fz="sm">
+                          {category.name}
+                        </Text>
+                        <Text fz="xs" c="dimmed">
+                          ID: {category.id}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge variant="light" color="blue" size="sm">
+                          {category.branch_id && category.branch_id.length > 0
+                            ? getBranchLabel(category.branch_id[0])
+                            : "No branch"}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm">{category.info1 || "-"}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge
+                          color={category.active ? "green" : "red"}
+                          variant="filled"
+                          size="sm"
+                        >
+                          {category.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap={4} justify="center">
+                          <ActionIcon
+                            variant="subtle"
+                            color="blue"
+                            size="sm"
+                            radius="sm"
+                          >
+                            <IconEdit size={14} />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            size="sm"
+                            radius="sm"
+                            loading={deletingId === category.uid}
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `Are you sure you want to delete category "${category.name}"?`
+                                )
+                              ) {
+                                handleDeleteCategory(category.uid);
+                              }
+                            }}
+                          >
+                            <IconTrash size={14} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))
+                )}
+              </Table.Tbody>
+            </Table>
+          </Box>
+        )}
 
-      {/* Create Category Modal */}
-      <Modal
-        opened={opened}
-        onClose={close}
-        centered
-        size="sm"
-        title={
-          <Title order={4} c="gray">
-            Add New Category
-          </Title>
-        }
-        overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
-      >
-        <form onSubmit={form.onSubmit(handleCategorySubmit)}>
-          <Stack gap="md">
-            <TextInput
-              label="Category Name"
-              placeholder="Enter category name"
-              withAsterisk
-              {...form.getInputProps("name")}
-            />
+        {/* Create Category Modal */}
+        <Modal
+          opened={opened}
+          onClose={close}
+          centered
+          size="sm"
+          title={
+            <Title order={4} c="gray">
+              Add New Category
+            </Title>
+          }
+          overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
+        >
+          <form onSubmit={form.onSubmit(handleCategorySubmit)}>
+            <Stack gap="md">
+              <TextInput
+                label="Category Name"
+                placeholder="Enter category name"
+                withAsterisk
+                {...form.getInputProps("name")}
+              />
 
-            <Select
-              label="Branch"
-              placeholder="Select branch"
-              withAsterisk
-              data={branches}
-              {...form.getInputProps("branch_id")}
-            />
+              <Select
+                label="Branch"
+                placeholder="Select branch"
+                withAsterisk
+                data={branches}
+                {...form.getInputProps("branch_id")}
+              />
 
-            <Group justify="flex-end" mt="xl">
-              <Button variant="outline" onClick={close} disabled={submitting}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                loading={submitting}
-                leftSection={<IconPlus size={18} />}
-              >
-                Create Category
-              </Button>
-            </Group>
-          </Stack>
-        </form>
-      </Modal>
-    </Card>
+              <Group justify="flex-end" mt="xl">
+                <Button variant="outline" onClick={close} disabled={submitting}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  loading={submitting}
+                  leftSection={<IconPlus size={18} />}
+                >
+                  Create Category
+                </Button>
+              </Group>
+            </Stack>
+          </form>
+        </Modal>
+      </Card>
+    </Stack>
   );
 }
