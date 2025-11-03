@@ -21,6 +21,7 @@ export const Login = () => {
   const location = useLocation();
   const from = location.state?.from?.pathname || "/";
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const form = useForm({
     initialValues: {
@@ -38,6 +39,7 @@ export const Login = () => {
     user_id: string;
     password: string;
   }) => {
+    setSubmitting(true);
     setError("");
     try {
       const res = await fetch(
@@ -51,7 +53,7 @@ export const Login = () => {
 
       const data = await res.json();
       if (res.ok && data.access_token) {
-        login(data); // ✅ store user + token globally
+        login(data);
         navigate(from, { replace: true });
       } else {
         setError(data.message || "Invalid user ID or password.");
@@ -59,6 +61,8 @@ export const Login = () => {
     } catch (err) {
       console.error(err);
       setError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -106,7 +110,8 @@ export const Login = () => {
               <Button
                 type="submit"
                 fullWidth
-                loading={loading}
+                loading={submitting}
+                disabled={submitting}
                 mt={10}
                 size="md"
               >
