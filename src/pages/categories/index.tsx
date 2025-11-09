@@ -31,21 +31,9 @@ import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useAuth } from "../../AuthProvider";
+import { BranchOption, Category } from "./type";
 
-interface Category {
-  uid: string;
-  id: string;
-  name: string;
-  branch_id: string[];
-  active: boolean;
-  created_at?: string;
-  info1?: string | null;
-}
 
-interface BranchOption {
-  value: string;
-  label: string;
-}
 
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);

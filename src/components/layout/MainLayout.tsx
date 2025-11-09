@@ -19,6 +19,7 @@ import {
   IconCategory,
   IconBell,
   IconReceipt,
+  IconBuildingStore,
 } from "@tabler/icons-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../AuthProvider";
@@ -31,6 +32,7 @@ const MainLayout = () => {
 
   const menuItems = [
     { icon: IconBuilding, label: "Dashboard", path: "/dashboard" },
+    { icon: IconBuildingStore, label: "Branches", path: "/branches" },
     {
       icon: IconPackage,
       label: "Products",

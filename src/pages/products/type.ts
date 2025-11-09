@@ -50,10 +50,11 @@ export interface CreateProductPayload {
   name: string;
   company_id: string;
   base_uom: string;
-  branch_id: string[];
   description?: string;
-  actual_cost: number;
-  selling_price: number;
+  category?: string;
+  brand_name: string;
+  serial_number?: string;
+  model_number?:string;
 }
 
 
