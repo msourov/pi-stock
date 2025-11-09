@@ -2,12 +2,11 @@ import {
   AppShell,
   Group,
   Text,
-  NavLink,
   Box,
-  Avatar,
   Menu,
   UnstyledButton,
   Image,
+  ActionIcon,
 } from "@mantine/core";
 import {
   IconBuilding,
@@ -18,9 +17,12 @@ import {
   IconChevronDown,
   IconBox,
   IconCategory,
+  IconBell,
+  IconReceipt,
 } from "@tabler/icons-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../AuthProvider";
+import Footer from "../ui/Footer";
 
 const MainLayout = () => {
   const { user, logout } = useAuth();
@@ -42,231 +44,231 @@ const MainLayout = () => {
         { icon: IconBox, label: "All Products", path: "/products" },
       ],
     },
-    { icon: IconTrendingUp, label: "Stock", path: "/stock" },
+    { icon: IconTrendingUp, label: "Stocks", path: "/stocks" },
+    { icon: IconReceipt, label: "Orders", path: "/orders" },
   ];
 
   return (
     <AppShell
       padding="md"
-      navbar={{
-        width: 280,
-        breakpoint: "xs",
-      }}
       header={{
-        height: 70,
+        height: 100, // Reduced from previous
       }}
     >
-      {/* Header with gradient background */}
+      {/* Top Bar - Clean and minimal */}
       <AppShell.Header
         style={{
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          border: "none",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          background: "white",
+          borderBottom: "1px solid #e2e8f0",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
         }}
       >
-        <Group h="100%" px="md" justify="space-between">
+        {/* Top Row - Logo and User Controls */}
+        <Group h="50px" px="lg" justify="space-between">
           <Group gap="sm" align="center">
             <Image
-              w={32}
-              h={32}
+              w={28}
+              h={28}
               src="/assets/stock-icon.png"
               alt="Pi-Stock logo"
-              style={{
-                filter: "brightness(0.3) invert(1)",
-              }}
             />
             <Text
-              fw={800}
-              size="xl"
+              fw={700}
+              size="lg"
               style={{
-                color: "white",
-                textShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                color: "#1e293b",
               }}
             >
               Pi-Stock
             </Text>
           </Group>
 
-          <Menu shadow="md" width={200}>
-            <Menu.Target>
-              <UnstyledButton>
-                <Group gap="sm">
-                  <Avatar
-                    color="white"
-                    bg="rgba(255,255,255,0.2)"
-                    radius="xl"
-                  />
-                  <Box>
-                    <Text fw={600} style={{ color: "white" }}>
-                      {user?.name}
-                    </Text>
-                    {/* <Text size="xs" style={{ color: "rgba(255,255,255,0.8)" }}>
-                      {user?.role}
-                    </Text> */}
-                  </Box>
-                  <IconChevronDown size={16} color="white" />
-                </Group>
-              </UnstyledButton>
-            </Menu.Target>
+          <Group gap="xs">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="lg"
+              className="hover:rounded-full"
+            >
+              <IconBell size={22} />
+            </ActionIcon>
+            <Menu shadow="md" width={200} position="bottom-end">
+              <Menu.Target>
+                <UnstyledButton>
+                  <Group
+                    gap="xs"
+                    className="bg-gray-100 border-purple-300 border-[0.5px] px-2 py-0.5 rounded-lg"
+                  >
+                    <Image src="/assets/profile.png" w={26} />
+                    <Box className="flex flex-col gap-0 p-o">
+                      <Text size="xs">
+                        {user?.name
+                          ?.split(" ")
+                          .map((n) => n[0].toUpperCase())
+                          .join("")}
+                      </Text>
+                      <Text size="xs" style={{ color: "#64748b" }}>
+                        Admin
+                      </Text>
+                    </Box>
+                    <IconChevronDown size={14} color="#64748b" />
+                  </Group>
+                </UnstyledButton>
+              </Menu.Target>
 
-            <Menu.Dropdown>
-              <Menu.Label>Account</Menu.Label>
-              <Menu.Item
-                leftSection={<IconUser size={14} />}
-                style={{ borderRadius: 6 }}
-              >
-                Profile
-              </Menu.Item>
-              <Menu.Divider />
-              <Menu.Item
-                leftSection={<IconLogout size={14} />}
-                onClick={logout}
-                color="red"
-                style={{ borderRadius: 6 }}
-              >
-                Logout
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+              <Menu.Dropdown>
+                <Menu.Label>Account</Menu.Label>
+                <Menu.Item
+                  leftSection={<IconUser size={14} />}
+                  style={{ borderRadius: 6 }}
+                >
+                  Profile
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item
+                  leftSection={<IconLogout size={14} />}
+                  onClick={logout}
+                  color="red"
+                  style={{ borderRadius: 6 }}
+                >
+                  Logout
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
         </Group>
-      </AppShell.Header>
 
-      {/* Navbar with subtle gradient */}
-      <AppShell.Navbar
-        p="md"
-        style={{
-          background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)",
-          borderRight: "1px solid #e2e8f0",
-        }}
-      >
-        <AppShell.Section grow>
+        {/* Navigation Menu Bar */}
+        <div
+          className="mx-auto mt-2 flex justify-center items-center"
+          style={{ borderTop: "1px solid #f1f5f9" }}
+        >
           {menuItems.map((item) => {
             const Icon = item.icon;
             const hasChildren = item.children && item.children.length > 0;
+            const isActive =
+              location.pathname === item.path ||
+              (item.path !== "/dashboard" &&
+                location.pathname.startsWith(item.path));
 
             if (hasChildren) {
               return (
-                <NavLink
+                <Menu
                   key={item.path}
-                  label={item.label}
-                  leftSection={<Icon size={20} />}
-                  variant="light"
-                  mb={6}
-                  style={{
-                    borderRadius: 8,
-                    backgroundColor: location.pathname.startsWith(item.path)
-                      ? "rgba(99, 102, 241, 0.1)"
-                      : "transparent",
-                    border: location.pathname.startsWith(item.path)
-                      ? "1px solid rgba(99, 102, 241, 0.2)"
-                      : "1px solid transparent",
-                  }}
-                  active={location.pathname.startsWith(item.path)}
+                  shadow="md"
+                  width={220}
+                  position="bottom-start"
                 >
-                  {item.children.map((child) => {
-                    const ChildIcon = child.icon;
-                    const isActive = location.pathname === child.path;
-                    return (
-                      <NavLink
-                        key={child.path}
-                        label={child.label}
-                        leftSection={<ChildIcon size={16} />}
-                        active={isActive}
-                        onClick={() => navigate(child.path)}
+                  <Menu.Target>
+                    <UnstyledButton>
+                      <Group
+                        gap="xs"
                         style={{
-                          borderRadius: 6,
-                          backgroundColor: isActive
-                            ? "rgba(99, 102, 241, 0.15)"
-                            : "transparent",
-                          borderLeft: isActive
-                            ? "3px solid #6366f1"
-                            : "3px solid transparent",
-                          marginLeft: "8px",
-                          marginBottom: "2px",
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          transition: "all 0.2s ease",
                         }}
-                      />
-                    );
-                  })}
-                </NavLink>
+                      >
+                        <Icon
+                          size={18}
+                          color={isActive ? "purple" : "#64748b"}
+                        />
+                        <Text
+                          style={{
+                            color: isActive ? "purple" : "#64748b",
+                            fontWeight: isActive ? 600 : 400,
+                            fontSize: "14px",
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                        <IconChevronDown
+                          size={14}
+                          color={isActive ? "purple" : "#64748b"}
+                        />
+                      </Group>
+                    </UnstyledButton>
+                  </Menu.Target>
+
+                  <Menu.Dropdown>
+                    <Menu.Label>{item.label}</Menu.Label>
+                    {item.children.map((child) => {
+                      const ChildIcon = child.icon;
+                      const isChildActive = location.pathname === child.path;
+                      return (
+                        <Menu.Item
+                          key={child.path}
+                          leftSection={<ChildIcon size={16} />}
+                          onClick={() => navigate(child.path)}
+                          style={{
+                            backgroundColor: isChildActive
+                              ? "rgba(99, 102, 241, 0.1)"
+                              : "transparent",
+                            fontWeight: isChildActive ? 600 : 400,
+                            color: isChildActive ? "#6366f1" : "#334155",
+                          }}
+                        >
+                          {child.label}
+                        </Menu.Item>
+                      );
+                    })}
+                  </Menu.Dropdown>
+                </Menu>
               );
             }
 
-            const isActive = location.pathname === item.path;
             return (
-              <NavLink
+              <UnstyledButton
                 key={item.path}
-                label={item.label}
-                leftSection={<Icon size={20} />}
-                active={isActive}
                 onClick={() => navigate(item.path)}
-                variant="light"
-                mb={6}
-                style={{
-                  borderRadius: 8,
-                  backgroundColor: isActive
-                    ? "rgba(99, 102, 241, 0.1)"
-                    : "transparent",
-                  border: isActive
-                    ? "1px solid rgba(99, 102, 241, 0.2)"
-                    : "1px solid transparent",
-                  transition: "all 0.2s ease",
-                }}
-                styles={{
-                  label: {
-                    fontWeight: isActive ? 600 : 400,
-                    color: isActive ? "#6366f1" : "#334155",
-                  },
-                }}
-              />
+              >
+                <Group
+                  gap="xs"
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <Icon size={18} color={isActive ? "purple" : "#64748b"} />
+                  <Text
+                    style={{
+                      color: isActive ? "purple" : "#64748b",
+                      fontWeight: isActive ? 600 : 400,
+                      fontSize: "14px",
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </Group>
+              </UnstyledButton>
             );
           })}
-        </AppShell.Section>
-
-        {/* Footer section */}
-        <AppShell.Section
-          style={{
-            borderTop: "1px solid #e2e8f0",
-            padding: "8px 12px",
-            background: "rgba(241, 245, 249, 0.5)",
-            borderRadius: "8px",
-            marginTop: "16px",
-          }}
-        >
-          <Box>
-            <Text size="sm" fw={600} c="dark.4">
-              Pi-Stock v1.0
-            </Text>
-            <Text size="xs" c="dimmed" mt={2}>
-              Inventory Management System
-            </Text>
-            <Text size="xs" c="blue.6" mt={4} fw={500}>
-              Ready to serve your business
-            </Text>
-          </Box>
-        </AppShell.Section>
-      </AppShell.Navbar>
+        </div>
+      </AppShell.Header>
 
       {/* Main content area */}
       <AppShell.Main
         style={{
-          background:
-            "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)",
-          minHeight: "calc(100vh - 70px)",
+          background: "#f8fafc",
+          paddingInline: 0,
+          paddingTop: "100px",
+          minHeight: "calc(100vh - 100px)",
         }}
       >
         <Box
           style={{
+            padding: "0.5em 1em",
             background: "white",
-            borderRadius: "12px",
-            boxShadow:
-              "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-            minHeight: "calc(100vh - 110px)",
+            borderRadius: "8px",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+            minHeight: "calc(100vh - 120px)",
             border: "1px solid #e2e8f0",
           }}
-          p="md"
         >
           <Outlet />
         </Box>
+        <Footer />
       </AppShell.Main>
     </AppShell>
   );

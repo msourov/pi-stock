@@ -12,7 +12,9 @@ import Categories from "./pages/categories/index.tsx";
 import "./index.css";
 import "@mantine/notifications/styles.css";
 import "@mantine/core/styles.css";
+import "@mantine/dates/styles.css";
 import { Notifications } from "@mantine/notifications";
+import Order from "./pages/order/index.tsx";
 
 export const router = createBrowserRouter([
   {
@@ -40,8 +42,12 @@ export const router = createBrowserRouter([
         element: <Categories />,
       },
       {
-        path: "stock",
+        path: "stocks",
         element: <Stock />,
+      },
+      {
+        path: "orders",
+        element: <Order />,
       },
       {
         path: "dashboard",

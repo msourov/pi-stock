@@ -15,11 +15,12 @@ import {
   Box,
   Select,
   Tooltip,
+  NumberInput,
+  Pagination,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useForm } from "@mantine/form";
 import {
-  IconCheck,
   IconX,
   IconPlus,
   IconEdit,
@@ -27,16 +28,21 @@ import {
   IconSearch,
   IconRefresh,
   IconPackage,
-  IconTrendingUp,
-  IconClock,
-  IconDatabase,
   IconDownload,
   IconFilter,
+  IconCash,
+  IconCheck,
+  IconArrowDown,
+  IconArrowUp,
+  IconCalendar,
+  IconArrowDownCircle,
+  IconArrowUpCircle,
 } from "@tabler/icons-react";
-import type { CreateStockPayload, Stock } from "./type";
+import type { CreateStockPayload, ProductStatType, Stock } from "./type";
 import { useAuth } from "../../AuthProvider";
 import { notifications } from "@mantine/notifications";
 import CreateStockModal from "./components/CreateStockModal";
+import { DateInput } from "@mantine/dates";
 
 const Stock = () => {
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -49,9 +55,33 @@ const Stock = () => {
   const [, setSubmitting] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
+  const [productStat, setProductStat] = useState<ProductStatType[] | null>([]);
+  const [selectedMT, setSelectedMT] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [opened, { open, close }] = useDisclosure(false);
+  const [isSelling, setIsSelling] = useState(false);
   const { logout } = useAuth();
+
+  // Pagination state
+  const [pageSize, setPageSize] = useState(10);
+  const [paginationData, setPaginationData] = useState({
+    page: 1,
+    page_size: 10,
+    total_results: 0,
+    total_page: 0,
+  });
+
+  const handleAdd = () => {
+    setIsSelling(false);
+    open();
+  };
+
+  const handleSell = () => {
+    setIsSelling(true);
+    open();
+  };
 
   const [branches] = useState([
     { value: "73745874-e70b-498f-afd1-465464934f5b", label: "Main Branch" },
@@ -78,11 +108,19 @@ const Stock = () => {
     },
   });
 
-  const fetchStocks = async () => {
+  useEffect(() => {
+    if (isSelling) {
+      form.setFieldValue("movement_type", "sale");
+    }
+  }, [isSelling]);
+
+  const fetchStocks = async (page: number = 1, size: number = pageSize) => {
     setLoadingTable(true);
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/stock/all-full`,
+        `${
+          import.meta.env.VITE_API_BASE_URL
+        }/stock/all-full?page=${page}&page_size=${size}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -93,33 +131,133 @@ const Stock = () => {
 
       if (res.ok) {
         const data = await res.json();
-        setStocks(data?.data);
-        setFilteredStocks(data?.data);
+        const stocksData = data?.data || [];
+        setStocks(stocksData);
+        setFilteredStocks(stocksData);
+        setPaginationData({
+          page: data?.page || 1,
+          page_size: data?.page_size || size,
+          total_results: data?.total_results || stocksData.length,
+          total_page: data?.total_page,
+        });
       } else if (res.status === 401) {
         logout();
       } else {
         console.error("Fetch failed with status:", res.status);
         setStocks([]);
         setFilteredStocks([]);
+        setPaginationData((prev) => ({
+          ...prev,
+          total_results: 0,
+          total_page: 0,
+        }));
       }
     } catch (error) {
       console.error("Error fetching stocks:", error);
       setStocks([]);
       setFilteredStocks([]);
+      setPaginationData((prev) => ({
+        ...prev,
+        total_results: 0,
+        total_page: 0,
+      }));
     } finally {
       setLoadingTable(false);
     }
   };
 
-  const fetchStocksByProduct = async (productId: string, branchId?: string) => {
+  const getProductStat = async () => {
+    try {
+      let url = `${import.meta.env.VITE_API_BASE_URL}/stock/stock-by-product/${
+        selectedProduct || ""
+      }`;
+      if (selectedBranch) {
+        url += `&branch_id=${selectedBranch}`;
+      }
+      const res = await fetch(url, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setProductStat(data?.data);
+      } else if (res.status === 401) {
+        logout();
+      } else {
+        console.error("Fetch failed with status:", res.status);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    getProductStat();
+  }, [selectedProduct]);
+
+  const s: ProductStatType | undefined = productStat?.[0];
+
+  const stats = [
+    {
+      label: "Total Stock",
+      value: s?.total_stock ?? 0,
+      color: "#228be6",
+      icon: <IconPackage size={16} color="#228be6" />,
+    },
+    {
+      label: "Total Received",
+      value: s?.total_receive_stock ?? 0,
+      color: "#40c057",
+      icon: <IconArrowDown size={16} color="#40c057" />,
+    },
+    {
+      label: "Total Sent",
+      value: s?.total_send_stock ?? 0,
+      color: "#fa5252",
+      icon: <IconArrowUp size={16} color="#fa5252" />,
+    },
+    {
+      label: "Today’s Total Stock",
+      value: s?.today_total_stock ?? 0,
+      color: "#7950f2",
+      icon: <IconCalendar size={16} color="#7950f2" />,
+    },
+    {
+      label: "Today Received",
+      value: s?.today_total_received ?? 0,
+      color: "#0ca678",
+      icon: <IconArrowDownCircle size={16} color="#0ca678" />,
+    },
+    {
+      label: "Today Sent",
+      value: s?.today_total_sent ?? 0,
+      color: "#e03131",
+      icon: <IconArrowUpCircle size={16} color="#e03131" />,
+    },
+  ];
+
+  const filterProductStock = async (
+    productId: string,
+    branchId?: string,
+    movementType?: string,
+    page: number = 1,
+    size: number = pageSize
+  ) => {
     setFilterLoading(true);
     try {
       let url = `${
         import.meta.env.VITE_API_BASE_URL
-      }/stock/stock-by-product/${productId}?page=1&page_size=100`;
+      }/stock/all-full?page=${page}&page_size=${size}&product_id=${productId}`;
 
       if (branchId) {
         url += `&branch_id=${branchId}`;
+      }
+
+      if (movementType) {
+        url += `&movement_type=${movementType}`;
       }
 
       const res = await fetch(url, {
@@ -130,34 +268,61 @@ const Stock = () => {
 
       if (res.ok) {
         const data = await res.json();
-        setFilteredStocks(data?.data || []);
+        const filteredData = data?.data || [];
+        setFilteredStocks(filteredData);
+        setPaginationData({
+          page: data?.page || 1,
+          page_size: data?.page_size || size,
+          total_results: data?.total_results || filteredData.length,
+          total_page: data?.total_page,
+        });
       } else if (res.status === 401) {
         logout();
       } else {
         console.error("Filter fetch failed:", res.status);
         setFilteredStocks([]);
+        setPaginationData((prev) => ({
+          ...prev,
+          total_results: 0,
+          total_page: 0,
+        }));
       }
     } catch (error) {
       console.error("Error filtering stocks:", error);
       setFilteredStocks([]);
+      setPaginationData((prev) => ({
+        ...prev,
+        total_results: 0,
+        total_page: 0,
+      }));
     } finally {
       setFilterLoading(false);
     }
   };
 
-  const handleFilter = () => {
+  const handleFilter = (page: number = 1, size: number = pageSize) => {
     if (selectedProduct) {
-      fetchStocksByProduct(selectedProduct, selectedBranch ?? undefined);
+      filterProductStock(
+        selectedProduct,
+        selectedBranch ?? undefined,
+        selectedMT ?? undefined,
+        page,
+        size
+      );
     } else {
       // If no product selected, show all stocks
-      setFilteredStocks(stocks);
+      // setFilteredStocks(stocks);
+      fetchStocks(page, size);
     }
   };
 
   const handleResetFilter = () => {
     setSelectedProduct(null);
     setSelectedBranch(null);
+    setSelectedMT(null);
+    setProductStat(null);
     setFilteredStocks(stocks);
+    fetchStocks(1, pageSize);
   };
 
   const handleDownloadExcel = async () => {
@@ -216,8 +381,24 @@ const Stock = () => {
     }
   };
 
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    handleFilter(page, pageSize);
+  };
+
+  const handlePageSizeChange = (value: string | number) => {
+    let newValue = Number(value);
+
+    // Enforce minimum value of 5
+    if (isNaN(newValue) || newValue < 5) newValue = 5;
+    if (newValue > 100) newValue = 100;
+    const newSize = Number(value);
+    setPageSize(newSize);
+    handleFilter(1, newSize);
+  };
+
   useEffect(() => {
-    fetchStocks();
+    fetchStocks(1, pageSize);
   }, []);
 
   const fetchProductionOptions = async () => {
@@ -267,6 +448,7 @@ const Stock = () => {
   const handleSubmit = async (values: CreateStockPayload) => {
     const token = localStorage.getItem("token");
     setSubmitting(true);
+
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/stock/create`,
@@ -299,7 +481,7 @@ const Stock = () => {
       } else {
         notifications.show({
           title: "Error",
-          message: result?.message || "Failed to create category",
+          message: result?.detail || "Failed to create category",
           icon: <IconX />,
           color: "red",
         });
@@ -330,37 +512,6 @@ const Stock = () => {
     }
   };
 
-  const statCards = [
-    {
-      label: "Total Products",
-      value: new Set(stocks.map((s) => s.product_id)).size,
-      color: "#4299e1",
-      icon: <IconPackage size={20} color="#4299e1" />,
-    },
-    {
-      label: "Total Stock Value",
-      value:
-        "$" +
-        stocks
-          .reduce((sum, s) => sum + s.price * s.quantity, 0)
-          .toLocaleString(),
-      color: "#48bb78",
-      icon: <IconTrendingUp size={20} color="#48bb78" />,
-    },
-    {
-      label: "Pending Movements",
-      value: stocks.filter((s) => s.movement_status === "pending").length,
-      color: "#ed8936",
-      icon: <IconClock size={20} color="#ed8936" />,
-    },
-    {
-      label: "Total Records",
-      value: stocks.length,
-      color: "#9f7aea",
-      icon: <IconDatabase size={20} color="#9f7aea" />,
-    },
-  ];
-
   return (
     <Stack p="xs" gap="sm">
       {/* Header */}
@@ -383,63 +534,46 @@ const Stock = () => {
               Manage your inventory and stock movements
             </Text>
           </div>
-          <Button
-            leftSection={<IconPlus size={18} />}
-            onClick={open}
-            size="xs"
-            radius="sm"
-            color="purple"
-          >
-            Add Stock
-          </Button>
+          <div className="space-x-2">
+            <Button
+              leftSection={<IconCash size={18} />}
+              onClick={handleSell}
+              size="xs"
+              radius="sm"
+              color="teal"
+            >
+              Sell Product
+            </Button>
+            <Button
+              leftSection={<IconPlus size={18} />}
+              onClick={handleAdd}
+              size="xs"
+              radius="sm"
+              color="purple"
+            >
+              Add Stock
+            </Button>
+          </div>
         </Group>
       </Card>
-      {/* Stats */}
-      <Grid gutter="sm">
-        {statCards.map((stat) => (
-          <Grid.Col key={stat.label} span={{ base: 12, sm: 6, lg: 3 }}>
-            <Card
-              withBorder
-              p="sm"
-              radius="sm"
-              style={{
-                borderLeft: `3px solid ${stat.color}`,
-                background: "white",
-              }}
-            >
-              <Group gap={6} align="flex-start">
-                <Box
-                  p={6}
-                  style={{
-                    background: `${stat.color}20`,
-                    borderRadius: 6,
-                  }}
-                >
-                  {stat.icon}
-                </Box>
-                <div>
-                  <Text fz="xs" c="dimmed" fw={500}>
-                    {stat.label}
-                  </Text>
-                  <Text fz="lg" fw={700}>
-                    {stat.value}
-                  </Text>
-                </div>
-              </Group>
-            </Card>
-          </Grid.Col>
-        ))}
-      </Grid>
 
       {/* Filters */}
-      <Card withBorder radius="md" p="sm" style={{ background: "white" }}>
+      <Card radius="md" p={0} pb={4} style={{ background: "white" }}>
         <Group gap="sm" align="flex-end">
           <Select
             label="Product"
             placeholder="Select product"
             data={productOptions.map((p) => ({ value: p.uid, label: p.name }))}
             value={selectedProduct}
-            onChange={(value) => setSelectedProduct(value || "")}
+            onChange={(value) => {
+              const newValue = value || "";
+              setSelectedProduct(newValue);
+
+              if (!newValue) {
+                setProductStat(null);
+                setFilteredStocks(stocks);
+              }
+            }}
             size="xs"
             style={{ minWidth: 150 }}
             clearable
@@ -449,16 +583,50 @@ const Stock = () => {
             placeholder="All branches"
             data={branches}
             value={selectedBranch}
+            disabled={!selectedProduct}
             onChange={(value) => setSelectedBranch(value || "")}
             size="xs"
             style={{ minWidth: 140 }}
             clearable
           />
+          <Select
+            label="Movement Type"
+            placeholder="Select Movement Type"
+            data={[
+              { value: "opening", label: "Opening Stock" },
+              { value: "purchase", label: "Purchase" },
+              { value: "sale", label: "Sale" },
+            ]}
+            value={selectedMT}
+            disabled={!selectedProduct}
+            onChange={(value) => setSelectedMT(value || "")}
+            size="xs"
+            style={{ minWidth: 140 }}
+            clearable
+          />
+          {/* Start Date */}
+          <DateInput
+            label="Start Date"
+            placeholder="Pick start date"
+            value={startDate}
+            onChange={setStartDate}
+            size="xs"
+          />
+
+          {/* End Date */}
+          <DateInput
+            label="End Date"
+            placeholder="Pick end date"
+            value={endDate}
+            onChange={setEndDate}
+            size="xs"
+          />
           <Button
             size="xs"
-            onClick={handleFilter}
+            onClick={() => handleFilter(1, pageSize)}
             loading={filterLoading}
             leftSection={<IconFilter size={14} />}
+            disabled={!selectedProduct}
           >
             Filter
           </Button>
@@ -483,7 +651,7 @@ const Stock = () => {
                 variant="outline"
                 onClick={handleDownloadExcel}
                 leftSection={<IconDownload size={14} />}
-                disabled={!selectedProduct}
+                disabled={!selectedProduct || !(startDate && endDate)}
               >
                 Export Excel
               </Button>
@@ -500,6 +668,55 @@ const Stock = () => {
         </Group>
       </Card>
 
+      {/* Stats */}
+      <Grid gutter="sm">
+        {stats.map((stat) => (
+          <Grid.Col
+            key={stat.label}
+            span={{
+              base: 12,
+              xs: 6,
+              sm: 4,
+              md: 4,
+              lg: 3,
+              xl: 2,
+            }}
+          >
+            <Card
+              withBorder
+              p="sm"
+              radius="sm"
+              style={{
+                borderLeft: `3px solid ${stat.color}`,
+                background: "white",
+                height: "100%",
+              }}
+            >
+              <Group gap={6} align="flex-start" wrap="nowrap">
+                <Box
+                  p={6}
+                  style={{
+                    background: `${stat.color}20`,
+                    borderRadius: 6,
+                    flexShrink: 0,
+                  }}
+                >
+                  {stat.icon}
+                </Box>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {" "}
+                  <Text fz="xs" c="dimmed" fw={500} lineClamp={1}>
+                    {stat.label}
+                  </Text>
+                  <Text fz="lg" fw={700} lineClamp={1}>
+                    {stat.value}
+                  </Text>
+                </div>
+              </Group>
+            </Card>
+          </Grid.Col>
+        ))}
+      </Grid>
       {/* Table */}
       <Card withBorder radius="md" style={{ background: "white" }}>
         <Group justify="space-between" mb="xs" px="xs" pb={4}>
@@ -518,9 +735,9 @@ const Stock = () => {
             <Button
               variant="light"
               leftSection={<IconRefresh size={16} />}
-              onClick={fetchStocks}
+              onClick={() => fetchStocks(1, pageSize)}
               loading={loadingTable}
-              size="sm"
+              size="xs"
             >
               Refresh
             </Button>
@@ -547,7 +764,10 @@ const Stock = () => {
                 <Table.Tr>
                   <Table.Th>Product</Table.Th>
                   <Table.Th>Quantity</Table.Th>
-                  <Table.Th>Price</Table.Th>
+                  <Table.Th>Cost</Table.Th>
+                  <Table.Th>Selling Price(SP)</Table.Th>
+                  <Table.Th>Total Cost</Table.Th>
+                  <Table.Th>Total SP</Table.Th>
                   <Table.Th>Type</Table.Th>
                   <Table.Th>Reference</Table.Th>
                   <Table.Th ta="center">Actions</Table.Th>
@@ -576,7 +796,22 @@ const Stock = () => {
                           {s.quantity}
                         </Badge>
                       </Table.Td>
-                      <Table.Td fw={500}>${s.price}</Table.Td>
+                      <Table.Td fw={500}>
+                        <span className="font-bold text-lg mr-1">৳</span>
+                        {s.product_actual_cost}
+                      </Table.Td>
+                      <Table.Td fw={500}>
+                        <span className="font-bold text-lg mr-1">৳</span>
+                        {s.product_selling_price}
+                      </Table.Td>
+                      <Table.Td fw={500}>
+                        <span className="font-bold text-lg mr-1">৳</span>
+                        {s.quantity * parseInt(s.product_actual_cost)}
+                      </Table.Td>
+                      <Table.Td fw={500}>
+                        <span className="font-bold text-lg mr-1">৳</span>
+                        {s.quantity * parseInt(s.product_selling_price)}
+                      </Table.Td>
                       <Table.Td>
                         <Badge
                           color={getTypeColor(s.movement_type)}
@@ -626,6 +861,45 @@ const Stock = () => {
                 )}
               </Table.Tbody>
             </Table>
+
+            {/* Pagination */}
+            {filteredStocks.length > 0 && (
+              <div className="px-4 pt-4 pb-2 float-right">
+                <Group gap="sm" align="center">
+                  <Text fz="xs" c="dimmed">
+                    Rows per page:
+                  </Text>
+                  <NumberInput
+                    value={pageSize}
+                    onChange={handlePageSizeChange}
+                    min={5}
+                    max={100}
+                    size="xs"
+                    style={{ width: 60 }}
+                  />
+                  <Text fz="xs" c="dimmed">
+                    {(paginationData.page - 1) * paginationData.page_size + 1}-
+                    {Math.min(
+                      paginationData.page * paginationData.page_size,
+                      paginationData.total_results
+                    )}{" "}
+                    of {paginationData.total_results}
+                  </Text>
+                  <Pagination
+                    total={
+                      paginationData.total_page > 0
+                        ? paginationData.total_page
+                        : 1
+                    }
+                    value={paginationData.page}
+                    onChange={handlePageChange}
+                    color="blue"
+                    size="sm"
+                    disabled={loadingTable || filterLoading}
+                  />
+                </Group>
+              </div>
+            )}
           </Box>
         )}
       </Card>
@@ -638,6 +912,7 @@ const Stock = () => {
         form={form}
         productOptions={productOptions}
         handleSubmit={handleSubmit}
+        isSelling={isSelling}
       />
     </Stack>
   );

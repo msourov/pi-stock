@@ -27,6 +27,7 @@ type CreateStockModalProps = {
   handleSubmit: (
     values: import("../type").CreateStockPayload
   ) => void | Promise<void>;
+  isSelling: boolean;
   form: UseFormReturnType<import("../type").CreateStockPayload>;
   branches: Branch[];
   productOptions: ProductOption[];
@@ -35,6 +36,7 @@ type CreateStockModalProps = {
 const CreateStockModal = ({
   opened,
   close,
+  isSelling,
   handleSubmit,
   form,
   branches,
@@ -49,7 +51,7 @@ const CreateStockModal = ({
       padding="xl"
       title={
         <Title order={4} c="gray">
-          Add New Stock
+          {isSelling ? "Sell Product" : "Add New Stock"}
         </Title>
       }
       overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
@@ -86,18 +88,20 @@ const CreateStockModal = ({
           </Grid.Col>
 
           {/* Movement Type */}
-          <Grid.Col span={12}>
-            <Select
-              label="Movement Type"
-              data={[
-                { value: "opening", label: "Opening Stock" },
-                { value: "purchase", label: "Purchase" },
-                { value: "sale", label: "Sale" },
-              ]}
-              {...form.getInputProps("movement_type")}
-              withAsterisk
-            />
-          </Grid.Col>
+          {!isSelling && (
+            <Grid.Col span={12}>
+              <Select
+                label="Movement Type"
+                data={[
+                  { value: "opening", label: "Opening Stock" },
+                  { value: "purchase", label: "Purchase" },
+                  { value: "sale", label: "Sale" },
+                ]}
+                {...form.getInputProps("movement_type")}
+                withAsterisk
+              />
+            </Grid.Col>
+          )}
 
           {/* Quantity */}
           <Grid.Col span={12}>
@@ -133,7 +137,9 @@ const CreateStockModal = ({
           <Button type="submit" variant="outline" onClick={close}>
             Cancel
           </Button>
-          <Button type="submit">Create Stock</Button>
+          <Button type="submit">
+            {isSelling ? "Sell Product" : "Create Stock"}
+          </Button>
         </Group>
       </form>
     </Modal>
