@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   Box,
-  Badge,
   Button,
   Card,
   Group,
@@ -12,12 +11,10 @@ import {
   ActionIcon,
   Modal,
   TextInput,
-  Select,
   Stack,
   Grid,
 } from "@mantine/core";
 import {
-  IconBuilding,
   IconCategory,
   IconCheck,
   IconEdit,
@@ -31,9 +28,7 @@ import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useAuth } from "../../AuthProvider";
-import { BranchOption, Category } from "./type";
-
-
+import { Category } from "./type";
 
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -42,13 +37,17 @@ export default function Categories() {
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
 
-  const { logout } = useAuth();
+  const [editOpened, { open: openEdit, close: closeEdit }] =
+    useDisclosure(false);
+  const [deleteOpened, { open: openDeleteModal, close: closeDeleteModal }] =
+    useDisclosure(false);
+  const [deleting, setDeleting] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<{
+    uid: string;
+    name: string;
+  } | null>(null);
 
-  const branches: BranchOption[] = [
-    { value: "73745874-e70b-498f-afd1-465464934f5b", label: "Main Branch" },
-    { value: "branch-2", label: "Branch 2" },
-    { value: "branch-3", label: "Branch 3" },
-  ];
+  const { logout } = useAuth();
 
   const companyId = "61651c07-0fe1-4cb7-9d03-b918a613a5c9";
 
@@ -56,12 +55,10 @@ export default function Categories() {
     initialValues: {
       name: "",
       company_id: companyId,
-      branch_id: "",
       active: true,
     },
     validate: {
       name: (v) => (!v ? "Category name is required" : null),
-      branch_id: (v) => (!v ? "Branch is required" : null),
     },
   });
 
@@ -98,7 +95,6 @@ export default function Categories() {
   const handleCategorySubmit = async (values: {
     name: string;
     company_id: string;
-    branch_id: string;
     active: boolean;
   }) => {
     setSubmitting(true);
@@ -153,10 +149,66 @@ export default function Categories() {
     }
   };
 
-  const handleDeleteCategory = async (categoryId: string | number) => {
+  const handleUpdateCategory = async (
+    categoryId: string,
+    values: { name: string }
+  ) => {
+    setSubmitting(true);
+    const token = localStorage.getItem("token");
+    const payload = { ...values, uid: categoryId };
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/category/update/${categoryId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const result = await res.json();
+
+      if (result.success) {
+        notifications.show({
+          title: "Success",
+          message: result?.message || "Category updated successfully!",
+          icon: <IconCheck />,
+          color: "teal",
+        });
+
+        form.reset();
+        closeEdit();
+        fetchCategories(); // refresh category list
+      } else if (res.status === 401) {
+        logout();
+      } else {
+        notifications.show({
+          title: "Error",
+          message: result?.message || "Failed to update category",
+          icon: <IconX />,
+          color: "red",
+        });
+      }
+    } catch (err) {
+      console.error("Update category error:", err);
+      notifications.show({
+        title: "Something went wrong!",
+        message: "Please check your connection",
+        icon: <IconX />,
+        color: "red",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
     const token = localStorage.getItem("token");
     setDeletingId(categoryId);
-
+    setDeleting(true);
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/category/delete/${categoryId}`,
@@ -179,6 +231,7 @@ export default function Categories() {
         });
         setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
         fetchCategories();
+        closeDeleteModal();
       } else if (res.status === 401) {
         logout();
       } else {
@@ -199,16 +252,13 @@ export default function Categories() {
       });
     } finally {
       setDeletingId(null);
+      setDeleting(false);
     }
   };
 
   useEffect(() => {
     fetchCategories();
   }, []);
-
-  const getBranchLabel = (branchId: string) => {
-    return branches.find((b) => b.value === branchId)?.label || branchId;
-  };
 
   return (
     <Stack p="xs" gap="sm">
@@ -258,12 +308,6 @@ export default function Categories() {
             label: "Active Categories",
             value: categories.filter((c) => c.active).length,
             icon: <IconCheck size={16} color="#48bb78" />,
-          },
-          {
-            color: "#ed8936",
-            label: "Branches Used",
-            value: new Set(categories.flatMap((c) => c.branch_id)).size,
-            icon: <IconBuilding size={16} color="#ed8936" />,
           },
           {
             color: "#9f7aea",
@@ -342,9 +386,7 @@ export default function Categories() {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Name</Table.Th>
-                  <Table.Th>Branch</Table.Th>
                   <Table.Th>Additional Info</Table.Th>
-                  <Table.Th>Status</Table.Th>
                   <Table.Th style={{ textAlign: "center" }}>Actions</Table.Th>
                 </Table.Tr>
               </Table.Thead>
@@ -375,23 +417,7 @@ export default function Categories() {
                         </Text>
                       </Table.Td>
                       <Table.Td>
-                        <Badge variant="light" color="blue" size="sm">
-                          {category.branch_id && category.branch_id.length > 0
-                            ? getBranchLabel(category.branch_id[0])
-                            : "No branch"}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
                         <Text size="sm">{category.info1 || "-"}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge
-                          color={category.active ? "green" : "red"}
-                          variant="filled"
-                          size="sm"
-                        >
-                          {category.active ? "Active" : "Inactive"}
-                        </Badge>
                       </Table.Td>
                       <Table.Td>
                         <Group gap={4} justify="center">
@@ -400,9 +426,18 @@ export default function Categories() {
                             color="blue"
                             size="sm"
                             radius="sm"
+                            onClick={() => {
+                              setSelectedCategory({
+                                uid: category.uid,
+                                name: category.name,
+                              });
+                              form.setValues({ name: category.name });
+                              openEdit();
+                            }}
                           >
                             <IconEdit size={14} />
                           </ActionIcon>
+
                           <ActionIcon
                             variant="subtle"
                             color="red"
@@ -410,13 +445,11 @@ export default function Categories() {
                             radius="sm"
                             loading={deletingId === category.uid}
                             onClick={() => {
-                              if (
-                                confirm(
-                                  `Are you sure you want to delete category "${category.name}"?`
-                                )
-                              ) {
-                                handleDeleteCategory(category.uid);
-                              }
+                              setSelectedCategory({
+                                uid: category.uid,
+                                name: category.name,
+                              });
+                              openDeleteModal();
                             }}
                           >
                             <IconTrash size={14} />
@@ -452,15 +485,6 @@ export default function Categories() {
                 withAsterisk
                 {...form.getInputProps("name")}
               />
-
-              <Select
-                label="Branch"
-                placeholder="Select branch"
-                withAsterisk
-                data={branches}
-                {...form.getInputProps("branch_id")}
-              />
-
               <Group justify="flex-end" mt="xl">
                 <Button variant="outline" onClick={close} disabled={submitting}>
                   Cancel
@@ -475,6 +499,94 @@ export default function Categories() {
               </Group>
             </Stack>
           </form>
+        </Modal>
+        {/* Category Update Modal */}
+        <Modal
+          opened={editOpened}
+          onClose={closeEdit}
+          centered
+          size="sm"
+          title={
+            <Title order={4} c="gray">
+              Edit Category
+            </Title>
+          }
+          overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
+        >
+          <form
+            onSubmit={form.onSubmit((values) => {
+              if (selectedCategory)
+                handleUpdateCategory(selectedCategory.uid, values);
+            })}
+          >
+            <Stack gap="md">
+              <TextInput
+                label="Category Name"
+                placeholder="Enter new category name"
+                withAsterisk
+                {...form.getInputProps("name")}
+              />
+              <Group justify="flex-end" mt="xl">
+                <Button
+                  variant="outline"
+                  onClick={closeEdit}
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  loading={submitting}
+                  leftSection={<IconCheck size={18} />}
+                >
+                  Update Category
+                </Button>
+              </Group>
+            </Stack>
+          </form>
+        </Modal>
+        {/* Delete Category Modal */}
+        <Modal
+          opened={deleteOpened}
+          onClose={closeDeleteModal}
+          centered
+          size="sm"
+          transitionProps={{
+            transition: "fade",
+            duration: 200,
+            timingFunction: "linear",
+          }}
+          withCloseButton={false}
+        >
+          <Box ta="center" p="md">
+            <Text fw={600} size="lg" c="dark">
+              Delete Category?
+            </Text>
+            <Text size="sm" c="dimmed" mt={4}>
+              Are you sure you want to delete this category? This action cannot
+              be undone.
+            </Text>
+
+            <Group justify="center" mt="lg">
+              <Button
+                variant="default"
+                onClick={closeDeleteModal}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                loading={deleting}
+                onClick={() => {
+                  if (!selectedCategory?.uid) return;
+                  handleDeleteCategory(selectedCategory.uid);
+                }}
+              >
+                Delete
+              </Button>
+            </Group>
+          </Box>
         </Modal>
       </Card>
     </Stack>

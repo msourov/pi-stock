@@ -18,7 +18,6 @@ import {
   IconBox,
   IconCategory,
   IconBell,
-  IconReceipt,
   IconBuildingStore,
 } from "@tabler/icons-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
@@ -32,6 +31,7 @@ const MainLayout = () => {
 
   const menuItems = [
     { icon: IconBuilding, label: "Dashboard", path: "/dashboard" },
+    { icon: IconUser, label: "Users", path: "/users" },
     { icon: IconBuildingStore, label: "Branches", path: "/branches" },
     {
       icon: IconPackage,
@@ -47,14 +47,14 @@ const MainLayout = () => {
       ],
     },
     { icon: IconTrendingUp, label: "Stocks", path: "/stocks" },
-    { icon: IconReceipt, label: "Orders", path: "/orders" },
+    // { icon: IconReceipt, label: "Orders", path: "/orders" },
   ];
 
   return (
     <AppShell
       padding="md"
       header={{
-        height: 100, // Reduced from previous
+        height: 100,
       }}
     >
       {/* Top Bar - Clean and minimal */}
