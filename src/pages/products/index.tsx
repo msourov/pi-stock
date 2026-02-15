@@ -396,7 +396,6 @@ const Products = () => {
                   <Table.Th>Serial No.</Table.Th>
                   <Table.Th>Barcode</Table.Th>
                   <Table.Th>Brand</Table.Th>
-                  <Table.Th>Department</Table.Th>
                   <Table.Th>Category</Table.Th>
                   <Table.Th>Price</Table.Th>
                   <Table.Th>UOM</Table.Th>
@@ -446,9 +445,6 @@ const Products = () => {
                       </Table.Td>
                       <Table.Td>
                         <Text fw={500}>{product.brand_name || "-"}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text>{product.department || "-"}</Text>
                       </Table.Td>
                       <Table.Td>
                         {product.category ? (

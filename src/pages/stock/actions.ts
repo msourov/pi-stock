@@ -56,19 +56,24 @@ export const filterProductStock = async (
 export const updateStockStatus = async (
   token: string,
   stockId: string,
-  po_status: "approved" | "received" | "saled",
+  po_status: "approve" | "receive" | "sale",
   payload: Record<string, unknown>
 ) => {
   try {
+    const data = {
+      ...payload,
+      stock_id:stockId,
+      po_status: "approve"
+    }
     const res = await fetch(
-      `${API_BASE_URL}/stock-purchase/update_status/${stockId}`,
+      `${API_BASE_URL}/stock-purchase/update_status`,
       {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: token ? `Bearer ${token}` : "",
         },
-        body: JSON.stringify({ po_status, ...payload }),
+        body: JSON.stringify(data),
       }
     );
 

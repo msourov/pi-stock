@@ -43,8 +43,6 @@ export const useStockPage = ({
     total_page: 0,
   });
 
-  console.log(companyId, 'companyId')
-
   // Fetch all stocks
   const fetchStocks = async (page: number = 1, size: number = pageSize) => {
     setLoadingTable(true);

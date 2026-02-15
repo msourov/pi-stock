@@ -14,7 +14,6 @@ import "@mantine/notifications/styles.css";
 import "@mantine/core/styles.css";
 import "@mantine/dates/styles.css";
 import { Notifications } from "@mantine/notifications";
-import Order from "./pages/order/index.tsx";
 import Branch from "./pages/branch/index.tsx";
 import User from "./pages/user/index.tsx";
 
@@ -51,10 +50,10 @@ export const router = createBrowserRouter([
         path: "stocks",
         element: <Stock />,
       },
-      {
-        path: "orders",
-        element: <Order />,
-      },
+      // {
+      //   path: "orders",
+      //   element: <Order />,
+      // },
       {
         path: "branches",
         element: <Branch />,

@@ -89,8 +89,6 @@ const Stock = () => {
     userBranchId,
   });
 
-  console.log(stocks, "stocks");
-
   const [branches] = useState([
     { value: "73745874-e70b-498f-afd1-465464934f5b", label: "Main Branch" },
     { value: "branch-2", label: "Downtown Branch" },
@@ -371,7 +369,7 @@ const Stock = () => {
             <Table.Th>PO</Table.Th>
             <Table.Th>Product</Table.Th>
             <Table.Th>Quantity</Table.Th>
-            <Table.Th>Need By</Table.Th>
+            <Table.Th>Required By</Table.Th>
 
             {/* Only show cost columns for admin */}
             {isAdmin && (
@@ -379,7 +377,7 @@ const Stock = () => {
                 <Table.Th>Cost</Table.Th>
               </>
             )}
-            <Table.Th>Selling Price (SP)</Table.Th>
+            <Table.Th>Retail Price</Table.Th>
             <Table.Th>Status</Table.Th>
             <Table.Th ta="center">Actions</Table.Th>
           </Table.Tr>
@@ -526,7 +524,6 @@ const Stock = () => {
             }));
             try {
               const res = await createStock(token, { stock_history: payloads });
-              console.log(res);
               notifications.show({
                 title: "Success",
                 message: res.message || "Stock created successfully!",
@@ -653,7 +650,7 @@ const Stock = () => {
         <form
           onSubmit={approveForm.onSubmit((values) => {
             if (!selectedStock || !token) return;
-            updateStockStatus(token, selectedStock.uid, "approved", values);
+            updateStockStatus(token, selectedStock.uid, "approve", values);
           })}
         >
           <NumberInput
