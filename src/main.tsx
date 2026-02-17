@@ -1,21 +1,19 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import Products from "./pages/products/index.tsx";
 import { MantineProvider } from "@mantine/core";
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router";
 import ProtectedRoute from "./ProtectedRoute.tsx";
 import { Login } from "./pages/auth/Login.tsx";
 import MainLayout from "./components/layout/MainLayout.tsx"; // Adjust path as needed
 import { AuthProvider } from "./AuthContext.tsx";
-import Stock from "./pages/stock/index.tsx";
+import Stock from "./pages/transaction/index.tsx";
 import Categories from "./pages/categories/index.tsx";
-import "./index.css";
+import { Notifications } from "@mantine/notifications";
+import User from "./pages/user/index.tsx";
 import "@mantine/notifications/styles.css";
 import "@mantine/core/styles.css";
 import "@mantine/dates/styles.css";
-import { Notifications } from "@mantine/notifications";
-import Branch from "./pages/branch/index.tsx";
-import User from "./pages/user/index.tsx";
+import "./index.css";
 
 export const router = createBrowserRouter([
   {
@@ -39,24 +37,12 @@ export const router = createBrowserRouter([
         element: <User />,
       },
       {
-        path: "products",
-        element: <Products />,
-      },
-      {
-        path: "products/categories",
+        path: "categories",
         element: <Categories />,
       },
       {
         path: "stocks",
         element: <Stock />,
-      },
-      // {
-      //   path: "orders",
-      //   element: <Order />,
-      // },
-      {
-        path: "branches",
-        element: <Branch />,
       },
       {
         path: "dashboard",

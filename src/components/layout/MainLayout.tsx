@@ -10,12 +10,10 @@ import {
 } from "@mantine/core";
 import {
   IconBuilding,
-  IconPackage,
   IconTrendingUp,
   IconLogout,
   IconUser,
   IconChevronDown,
-  IconBox,
   IconCategory,
   IconBell,
   IconBuildingStore,
@@ -34,17 +32,9 @@ const MainLayout = () => {
     { icon: IconUser, label: "Users", path: "/users" },
     { icon: IconBuildingStore, label: "Branches", path: "/branches" },
     {
-      icon: IconPackage,
-      label: "Products",
-      path: "/products",
-      children: [
-        {
-          icon: IconCategory,
-          label: "Categories",
-          path: "/products/categories",
-        },
-        { icon: IconBox, label: "All Products", path: "/products" },
-      ],
+      icon: IconCategory,
+      label: "Categories",
+      path: "/categories",
     },
     { icon: IconTrendingUp, label: "Stocks", path: "/stocks" },
     // { icon: IconReceipt, label: "Orders", path: "/orders" },
@@ -147,77 +137,77 @@ const MainLayout = () => {
         >
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const hasChildren = item.children && item.children.length > 0;
+            // const hasChildren = item?.children && item?.children.length > 0;
             const isActive =
               location.pathname === item.path ||
               (item.path !== "/dashboard" &&
                 location.pathname.startsWith(item.path));
 
-            if (hasChildren) {
-              return (
-                <Menu
-                  key={item.path}
-                  shadow="md"
-                  width={220}
-                  position="bottom-start"
-                >
-                  <Menu.Target>
-                    <UnstyledButton>
-                      <Group
-                        gap="xs"
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: "6px",
-                          transition: "all 0.2s ease",
-                        }}
-                      >
-                        <Icon
-                          size={18}
-                          color={isActive ? "purple" : "#64748b"}
-                        />
-                        <Text
-                          style={{
-                            color: isActive ? "purple" : "#64748b",
-                            fontWeight: isActive ? 600 : 400,
-                            fontSize: "14px",
-                          }}
-                        >
-                          {item.label}
-                        </Text>
-                        <IconChevronDown
-                          size={14}
-                          color={isActive ? "purple" : "#64748b"}
-                        />
-                      </Group>
-                    </UnstyledButton>
-                  </Menu.Target>
+            // if (hasChildren) {
+            //   return (
+            //     <Menu
+            //       key={item.path}
+            //       shadow="md"
+            //       width={220}
+            //       position="bottom-start"
+            //     >
+            //       <Menu.Target>
+            //         <UnstyledButton>
+            //           <Group
+            //             gap="xs"
+            //             style={{
+            //               padding: "6px 12px",
+            //               borderRadius: "6px",
+            //               transition: "all 0.2s ease",
+            //             }}
+            //           >
+            //             <Icon
+            //               size={18}
+            //               color={isActive ? "purple" : "#64748b"}
+            //             />
+            //             <Text
+            //               style={{
+            //                 color: isActive ? "purple" : "#64748b",
+            //                 fontWeight: isActive ? 600 : 400,
+            //                 fontSize: "14px",
+            //               }}
+            //             >
+            //               {item.label}
+            //             </Text>
+            //             <IconChevronDown
+            //               size={14}
+            //               color={isActive ? "purple" : "#64748b"}
+            //             />
+            //           </Group>
+            //         </UnstyledButton>
+            //       </Menu.Target>
 
-                  <Menu.Dropdown>
-                    <Menu.Label>{item.label}</Menu.Label>
-                    {item.children.map((child) => {
-                      const ChildIcon = child.icon;
-                      const isChildActive = location.pathname === child.path;
-                      return (
-                        <Menu.Item
-                          key={child.path}
-                          leftSection={<ChildIcon size={16} />}
-                          onClick={() => navigate(child.path)}
-                          style={{
-                            backgroundColor: isChildActive
-                              ? "rgba(99, 102, 241, 0.1)"
-                              : "transparent",
-                            fontWeight: isChildActive ? 600 : 400,
-                            color: isChildActive ? "#6366f1" : "#334155",
-                          }}
-                        >
-                          {child.label}
-                        </Menu.Item>
-                      );
-                    })}
-                  </Menu.Dropdown>
-                </Menu>
-              );
-            }
+            //       <Menu.Dropdown>
+            //         <Menu.Label>{item.label}</Menu.Label>
+            //         {item.children.map((child) => {
+            //           const ChildIcon = child.icon;
+            //           const isChildActive = location.pathname === child.path;
+            //           return (
+            //             <Menu.Item
+            //               key={child.path}
+            //               leftSection={<ChildIcon size={16} />}
+            //               onClick={() => navigate(child.path)}
+            //               style={{
+            //                 backgroundColor: isChildActive
+            //                   ? "rgba(99, 102, 241, 0.1)"
+            //                   : "transparent",
+            //                 fontWeight: isChildActive ? 600 : 400,
+            //                 color: isChildActive ? "#6366f1" : "#334155",
+            //               }}
+            //             >
+            //               {child.label}
+            //             </Menu.Item>
+            //           );
+            //         })}
+            //       </Menu.Dropdown>
+            //     </Menu>
+            //   );
+            // }
 
             return (
               <UnstyledButton

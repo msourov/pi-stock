@@ -1,4 +1,5 @@
-import { CreateStockPayload } from "./types";
+import { CreateTransactionPayload } from "./types";
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -87,7 +88,7 @@ export const updateStockStatus = async (
 
 
 // Create new stock entry
-export const createStock = async (token: string, payload: CreateStockPayload) => {
+export const createStock = async (token: string, payload: CreateTransactionPayload) => {
   try {
     const res = await fetch(`${API_BASE_URL}/stock-purchase/create`, {
       method: "POST",
