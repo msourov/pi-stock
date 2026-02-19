@@ -16,8 +16,6 @@ import {
   ActionIcon,
   Text,
   Box,
-  MultiSelect,
-  NumberInput,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useForm } from "@mantine/form";
@@ -40,6 +38,10 @@ import { useAuth } from "../../AuthProvider";
 
 const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<{ uid: string; name: string }[]>(
+    []
+  );
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loadingTable, setLoadingTable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -48,38 +50,63 @@ const Products = () => {
 
   const { logout } = useAuth();
 
-  const [branches] = useState([
-    { value: "73745874-e70b-498f-afd1-465464934f5b", label: "Main Branch" },
-    { value: "branch-2", label: "Downtown Branch" },
-    { value: "branch-3", label: "West Side Branch" },
-  ]);
+  const user = JSON.parse(localStorage.getItem("user") || "");
 
-  const companyId = "61651c07-0fe1-4cb7-9d03-b918a613a5c9";
-
-  const form = useForm({
+  const form = useForm<CreateProductPayload>({
     validateInputOnChange: true,
     initialValues: {
       name: "",
-      company_id: companyId,
+      company_id: user.company_id,
       base_uom: "",
-      branch_id: [] as string[],
+      brand_name: "",
       description: "",
-      actual_cost: 0,
-      selling_price: 0,
+      category: "",
+      serial_number: "",
+      model_number: "",
     },
     validate: {
       name: (v) => (!v ? "Product name is required" : null),
       company_id: (v) => (!v ? "Company ID is required" : null),
       base_uom: (v) => (!v ? "Base UOM is required" : null),
-      branch_id: (v) =>
-        v.length === 0 ? "At least one branch is required" : null,
-      actual_cost: (v) =>
-        v <= 0 ? "Actual cost must be greater than 0" : null,
-      selling_price: (v) =>
-        v <= 0 ? "Selling price must be greater than 0" : null,
+      brand_name: (v) => (!v ? "Brand is required" : null),
       description: (v) => (!v ? "Description is required" : null),
     },
   });
+
+  const cats = categories.map((item) => ({
+    value: item?.uid,
+    label: item?.name,
+  }));
+
+  // Fetch categories
+  const fetchCategories = async () => {
+    setLoadingCategories(true);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/category/category-helper-pam`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data.data || []);
+      } else if (res.status === 401) {
+        logout();
+      } else {
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+      setCategories([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   // Fetch products
   const fetchProducts = async () => {
@@ -116,6 +143,7 @@ const Products = () => {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
 
   // Search functionality
@@ -147,13 +175,15 @@ const Products = () => {
       formData.append("name", values.name);
       formData.append("company_id", values.company_id);
       formData.append("base_uom", values.base_uom);
-      formData.append("description", values.description || "");
-      formData.append("actual_cost", String(values.actual_cost));
-      formData.append("selling_price", String(values.selling_price));
+      formData.append("brand_name", values.brand_name);
 
-      values.branch_id.forEach((id: string) => {
-        formData.append("branch_id[]", id);
-      });
+      if (values.description)
+        formData.append("description", values.description);
+      if (values.category) formData.append("category", values.category);
+      if (values.serial_number)
+        formData.append("serial_number", values.serial_number);
+      if (values.model_number)
+        formData.append("model_number", values.model_number);
 
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/product/create`,
@@ -366,7 +396,6 @@ const Products = () => {
                   <Table.Th>Serial No.</Table.Th>
                   <Table.Th>Barcode</Table.Th>
                   <Table.Th>Brand</Table.Th>
-                  <Table.Th>Department</Table.Th>
                   <Table.Th>Category</Table.Th>
                   <Table.Th>Price</Table.Th>
                   <Table.Th>UOM</Table.Th>
@@ -378,7 +407,6 @@ const Products = () => {
                   <Table.Tr>
                     <Table.Td colSpan={9} py="lg" ta="center">
                       <Box>
-                        <IconSearch size={36} color="gray" />
                         <Text mt={4} c="dimmed" fz="sm">
                           {searchTerm
                             ? "No matching products found"
@@ -417,9 +445,6 @@ const Products = () => {
                       </Table.Td>
                       <Table.Td>
                         <Text fw={500}>{product.brand_name || "-"}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text>{product.department || "-"}</Text>
                       </Table.Td>
                       <Table.Td>
                         {product.category ? (
@@ -507,33 +532,38 @@ const Products = () => {
               </Grid.Col>
 
               <Grid.Col span={{ base: 12, md: 6 }}>
-                <MultiSelect
-                  label="Branches"
-                  placeholder="Select branches"
+                <TextInput
+                  label="Brand Name"
+                  placeholder="Enter brand name"
                   withAsterisk
-                  data={branches}
-                  {...form.getInputProps("branch_id")}
-                  searchable
-                  clearable
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <NumberInput
-                  label="Actual Cost"
-                  placeholder="Enter actual cost"
-                  withAsterisk
-                  min={0}
-                  {...form.getInputProps("actual_cost")}
+                  {...form.getInputProps("brand_name")}
                 />
               </Grid.Col>
 
               <Grid.Col span={{ base: 12, md: 6 }}>
-                <NumberInput
-                  label="Selling Price"
-                  placeholder="Enter selling price"
+                <Select
+                  label="Category"
+                  placeholder="Select category"
                   withAsterisk
-                  min={0}
-                  {...form.getInputProps("selling_price")}
+                  data={cats}
+                  rightSection={loadingCategories ? <Loader size="xs" /> : null}
+                  {...form.getInputProps("category")}
+                />
+              </Grid.Col>
+
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Model Number"
+                  placeholder="Enter model number"
+                  {...form.getInputProps("model_number")}
+                />
+              </Grid.Col>
+
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Serial Number"
+                  placeholder="Enter serial number"
+                  {...form.getInputProps("serial_number")}
                 />
               </Grid.Col>
 

@@ -1,18 +1,20 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import Products from "./pages/products/index.tsx";
 import { MantineProvider } from "@mantine/core";
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router";
 import ProtectedRoute from "./ProtectedRoute.tsx";
 import { Login } from "./pages/auth/Login.tsx";
 import MainLayout from "./components/layout/MainLayout.tsx"; // Adjust path as needed
 import { AuthProvider } from "./AuthContext.tsx";
-import Stock from "./pages/stock/index.tsx";
+import Stock from "./pages/transaction/index.tsx";
 import Categories from "./pages/categories/index.tsx";
-import "./index.css";
+import { Notifications } from "@mantine/notifications";
+import User from "./pages/user/index.tsx";
 import "@mantine/notifications/styles.css";
 import "@mantine/core/styles.css";
-import { Notifications } from "@mantine/notifications";
+import "@mantine/dates/styles.css";
+import "./index.css";
+import CheckChepPage from "./pages/audit/index.tsx";
 
 export const router = createBrowserRouter([
   {
@@ -29,19 +31,23 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true, // This makes it the default route when path is "/"
-        element: <Navigate to="/products" replace />,
+        element: <Navigate to="/users" replace />,
       },
       {
-        path: "products",
-        element: <Products />,
+        path: "users",
+        element: <User />,
       },
       {
-        path: "products/categories",
+        path: "categories",
         element: <Categories />,
       },
       {
-        path: "stock",
+        path: "stocks",
         element: <Stock />,
+      },
+      {
+        path: "chep-audit",
+        element: <CheckChepPage />,
       },
       {
         path: "dashboard",
@@ -60,9 +66,9 @@ createRoot(document.getElementById("root")!).render(
       }}
     >
       <AuthProvider>
-        <Notifications />
+        <Notifications position="bottom-right" />
         <RouterProvider router={router} />
       </AuthProvider>
     </MantineProvider>
-  </StrictMode>
+  </StrictMode>,
 );

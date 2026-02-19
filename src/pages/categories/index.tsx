@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   Box,
-  Badge,
   Button,
   Card,
   Group,
@@ -11,17 +10,12 @@ import {
   Title,
   ActionIcon,
   Modal,
-  TextInput,
-  Select,
   Stack,
-  Grid,
 } from "@mantine/core";
 import {
-  IconBuilding,
   IconCategory,
   IconCheck,
   IconEdit,
-  IconInfoCircle,
   IconPlus,
   IconRefresh,
   IconTrash,
@@ -30,201 +24,70 @@ import {
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
-import { useAuth } from "../../AuthProvider";
-
-interface Category {
-  uid: string;
-  id: string;
-  name: string;
-  branch_id: string[];
-  active: boolean;
-  created_at?: string;
-  info1?: string | null;
-}
-
-interface BranchOption {
-  value: string;
-  label: string;
-}
+import useCategory from "./hooks";
+import CreateCategoryModal from "./components/CreateCategoryModal";
+import { EditCategoryModal } from "./components/EditCategoryModal";
 
 export default function Categories() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | number | null>(null);
-  const [opened, { open, close }] = useDisclosure(false);
+  const {
+    categories,
+    loading,
+    fetchCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+  } = useCategory();
 
-  const { logout } = useAuth();
+  const [deleting, setDeleting] = useState(false);
 
-  const branches: BranchOption[] = [
-    { value: "73745874-e70b-498f-afd1-465464934f5b", label: "Main Branch" },
-    { value: "branch-2", label: "Branch 2" },
-    { value: "branch-3", label: "Branch 3" },
-  ];
+  const [createOpened, { open: openCreate, close: closeCreate }] =
+    useDisclosure(false);
+  const [editOpened, { open: openEdit, close: closeEdit }] =
+    useDisclosure(false);
+  const [deleteOpened, { open: openDeleteModal, close: closeDeleteModal }] =
+    useDisclosure(false);
 
-  const companyId = "61651c07-0fe1-4cb7-9d03-b918a613a5c9";
+  const [selectedCategory, setSelectedCategory] = useState<{
+    uid: string;
+    name: string;
+  } | null>(null);
 
-  const form = useForm({
-    initialValues: {
-      name: "",
-      company_id: companyId,
-      branch_id: "",
-      active: true,
-    },
-    validate: {
-      name: (v) => (!v ? "Category name is required" : null),
-      branch_id: (v) => (!v ? "Branch is required" : null),
-    },
+  const editForm = useForm({
+    initialValues: { name: "" },
+    validate: { name: (v) => (!v.trim() ? "Category name is required" : null) },
   });
 
-  const fetchCategories = async () => {
-    setLoading(true);
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/category/all`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setCategories(data.data || []);
-      } else {
-        setCategories([]);
-      }
-      if (res.status === 401) {
-        logout();
-      }
-    } catch (err) {
-      console.error("Fetch categories error:", err);
-      setCategories([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCategorySubmit = async (values: {
-    name: string;
-    company_id: string;
-    branch_id: string;
-    active: boolean;
-  }) => {
-    setSubmitting(true);
-    const token = localStorage.getItem("token");
-
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/category/create`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-          body: JSON.stringify(values),
-        }
-      );
-
-      const result = await res.json();
-
-      if (result.success) {
-        notifications.show({
-          title: "Success",
-          message: result?.message || "Category created successfully!",
-          icon: <IconCheck />,
-          color: "teal",
-        });
-
-        form.reset();
-        close();
-        fetchCategories();
-      } else if (res.status === 401) {
-        logout();
-      } else {
-        notifications.show({
-          title: "Error",
-          message: result?.message || "Failed to create category",
-          icon: <IconX />,
-          color: "red",
-        });
-      }
-    } catch (err) {
-      console.error("Create category error:", err);
-      notifications.show({
-        title: "Something went wrong!",
-        message: "Please check your connection",
-        icon: <IconX />,
-        color: "red",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteCategory = async (categoryId: string | number) => {
-    const token = localStorage.getItem("token");
-    setDeletingId(categoryId);
-
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/category/delete/${categoryId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        }
-      );
-
-      const result = await res.json();
-
-      if (res.ok) {
-        notifications.show({
-          title: "Deleted",
-          message: result?.message || "Category deleted successfully!",
-          icon: <IconCheck />,
-          color: "teal",
-        });
-        setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
-        fetchCategories();
-      } else if (res.status === 401) {
-        logout();
-      } else {
-        notifications.show({
-          title: "Error",
-          message: result?.message || "Failed to delete category",
-          icon: <IconX />,
-          color: "red",
-        });
-      }
-    } catch (err) {
-      console.error("Delete category error:", err);
-      notifications.show({
-        title: "Network Error",
-        message: "Failed to connect to server",
-        icon: <IconX />,
-        color: "red",
-      });
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
   useEffect(() => {
-    fetchCategories();
+    fetchCategories().catch(() => {});
   }, []);
 
-  const getBranchLabel = (branchId: string) => {
-    return branches.find((b) => b.value === branchId)?.label || branchId;
+  const handleDeleteCategory = async () => {
+    if (!selectedCategory) return;
+    setDeleting(true);
+    try {
+      const result = await deleteCategory(selectedCategory.uid);
+      notifications.show({
+        title: "Deleted",
+        message: result.message,
+        color: "teal",
+        icon: <IconCheck size={16} />,
+      });
+      closeDeleteModal();
+      await fetchCategories();
+    } catch (err: unknown) {
+      notifications.show({
+        title: "Error",
+        message: err instanceof Error ? err.message : "An error occurred",
+        color: "red",
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
     <Stack p="xs" gap="sm">
-      {/* Header Section */}
       <Card
         withBorder
         shadow="xs"
@@ -246,80 +109,17 @@ export default function Categories() {
           </div>
           <Button
             leftSection={<IconPlus size={14} />}
-            onClick={open}
+            onClick={openCreate}
             size="xs"
             radius="sm"
-            color="purple"
+            color="indigo"
           >
             Add Category
           </Button>
         </Group>
       </Card>
 
-      {/* Stats Cards */}
-      <Grid gutter="sm">
-        {[
-          {
-            color: "#4299e1",
-            label: "Total Categories",
-            value: categories.length,
-            icon: <IconCategory size={16} color="#4299e1" />,
-          },
-          {
-            color: "#48bb78",
-            label: "Active Categories",
-            value: categories.filter((c) => c.active).length,
-            icon: <IconCheck size={16} color="#48bb78" />,
-          },
-          {
-            color: "#ed8936",
-            label: "Branches Used",
-            value: new Set(categories.flatMap((c) => c.branch_id)).size,
-            icon: <IconBuilding size={16} color="#ed8936" />,
-          },
-          {
-            color: "#9f7aea",
-            label: "With Additional Info",
-            value: categories.filter((c) => c.info1).length,
-            icon: <IconInfoCircle size={16} color="#9f7aea" />,
-          },
-        ].map(({ color, label, value, icon }, index) => (
-          <Grid.Col key={index} span={{ base: 12, sm: 6, lg: 3 }}>
-            <Card
-              withBorder
-              p="sm"
-              radius="sm"
-              style={{
-                borderLeft: `3px solid ${color}`,
-                background: "white",
-              }}
-            >
-              <Group gap={6} align="flex-start">
-                <Box
-                  p={6}
-                  style={{
-                    background: `${color}1A`,
-                    borderRadius: 6,
-                  }}
-                >
-                  {icon}
-                </Box>
-                <div style={{ flex: 1 }}>
-                  <Text fz="xs" c="dimmed" fw={500}>
-                    {label}
-                  </Text>
-                  <Text fz="lg" fw={700} c="dark.4">
-                    {value}
-                  </Text>
-                </div>
-              </Group>
-            </Card>
-          </Grid.Col>
-        ))}
-      </Grid>
-
-      {/* Table Section */}
-      <Card withBorder radius="md" style={{ background: "white" }}>
+      <Card withBorder radius="md" mt={8} style={{ background: "white" }}>
         <Group justify="space-between" mb="xs" px="xs" pb={4}>
           <Title order={5} c="dark.4">
             Category List
@@ -327,7 +127,7 @@ export default function Categories() {
           <Button
             variant="light"
             leftSection={<IconRefresh size={14} />}
-            onClick={fetchCategories}
+            onClick={() => fetchCategories().catch(() => {})}
             disabled={loading}
             size="xs"
           >
@@ -354,16 +154,14 @@ export default function Categories() {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Name</Table.Th>
-                  <Table.Th>Branch</Table.Th>
-                  <Table.Th>Additional Info</Table.Th>
-                  <Table.Th>Status</Table.Th>
+                  <Table.Th>Type</Table.Th>
                   <Table.Th style={{ textAlign: "center" }}>Actions</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {categories.length === 0 ? (
                   <Table.Tr>
-                    <Table.Td colSpan={5} py="lg" ta="center">
+                    <Table.Td colSpan={3} py="lg" ta="center">
                       <Box>
                         <IconCategory size={36} color="gray" />
                         <Text mt={4} c="dimmed" fz="sm">
@@ -377,33 +175,16 @@ export default function Categories() {
                   </Table.Tr>
                 ) : (
                   categories.map((category) => (
-                    <Table.Tr key={category.id}>
+                    <Table.Tr key={category.uid}>
                       <Table.Td>
                         <Text fw={600} fz="sm">
                           {category.name}
                         </Text>
-                        <Text fz="xs" c="dimmed">
-                          ID: {category.id}
+                      </Table.Td>
+                      <Table.Td>
+                        <Text fz="sm" c="dimmed">
+                          {category.category_type || "-"}
                         </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge variant="light" color="blue" size="sm">
-                          {category.branch_id && category.branch_id.length > 0
-                            ? getBranchLabel(category.branch_id[0])
-                            : "No branch"}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">{category.info1 || "-"}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge
-                          color={category.active ? "green" : "red"}
-                          variant="filled"
-                          size="sm"
-                        >
-                          {category.active ? "Active" : "Inactive"}
-                        </Badge>
                       </Table.Td>
                       <Table.Td>
                         <Group gap={4} justify="center">
@@ -412,6 +193,14 @@ export default function Categories() {
                             color="blue"
                             size="sm"
                             radius="sm"
+                            onClick={() => {
+                              setSelectedCategory({
+                                uid: category.uid,
+                                name: category.name,
+                              });
+                              editForm.setValues({ name: category.name });
+                              openEdit();
+                            }}
                           >
                             <IconEdit size={14} />
                           </ActionIcon>
@@ -420,15 +209,15 @@ export default function Categories() {
                             color="red"
                             size="sm"
                             radius="sm"
-                            loading={deletingId === category.uid}
+                            loading={
+                              deleting && selectedCategory?.uid === category.uid
+                            }
                             onClick={() => {
-                              if (
-                                confirm(
-                                  `Are you sure you want to delete category "${category.name}"?`
-                                )
-                              ) {
-                                handleDeleteCategory(category.uid);
-                              }
+                              setSelectedCategory({
+                                uid: category.uid,
+                                name: category.name,
+                              });
+                              openDeleteModal();
                             }}
                           >
                             <IconTrash size={14} />
@@ -442,53 +231,58 @@ export default function Categories() {
             </Table>
           </Box>
         )}
-
-        {/* Create Category Modal */}
-        <Modal
-          opened={opened}
-          onClose={close}
-          centered
-          size="sm"
-          title={
-            <Title order={4} c="gray">
-              Add New Category
-            </Title>
-          }
-          overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
-        >
-          <form onSubmit={form.onSubmit(handleCategorySubmit)}>
-            <Stack gap="md">
-              <TextInput
-                label="Category Name"
-                placeholder="Enter category name"
-                withAsterisk
-                {...form.getInputProps("name")}
-              />
-
-              <Select
-                label="Branch"
-                placeholder="Select branch"
-                withAsterisk
-                data={branches}
-                {...form.getInputProps("branch_id")}
-              />
-
-              <Group justify="flex-end" mt="xl">
-                <Button variant="outline" onClick={close} disabled={submitting}>
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  loading={submitting}
-                  leftSection={<IconPlus size={18} />}
-                >
-                  Create Category
-                </Button>
-              </Group>
-            </Stack>
-          </form>
-        </Modal>
       </Card>
+
+      <CreateCategoryModal
+        opened={createOpened}
+        onClose={closeCreate}
+        onCreate={createCategory}
+        onSuccess={() => fetchCategories().catch(() => {})}
+      />
+
+      <EditCategoryModal
+        opened={editOpened}
+        onClose={closeEdit}
+        category={selectedCategory}
+        onUpdate={updateCategory}
+        onSuccess={() => fetchCategories()}
+      />
+
+      <Modal
+        opened={deleteOpened}
+        onClose={closeDeleteModal}
+        centered
+        size="sm"
+        withCloseButton={false}
+        transitionProps={{ transition: "fade", duration: 200 }}
+      >
+        <Box ta="center" p="md">
+          <Text fw={600} size="lg" c="dark">
+            Delete Category?
+          </Text>
+          <Text size="sm" c="dimmed" mt={4}>
+            Are you sure you want to delete{" "}
+            <strong>{selectedCategory?.name}</strong>? This action cannot be
+            undone.
+          </Text>
+          <Group justify="center" mt="lg">
+            <Button
+              variant="default"
+              onClick={closeDeleteModal}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              loading={deleting}
+              onClick={handleDeleteCategory}
+            >
+              Delete
+            </Button>
+          </Group>
+        </Box>
+      </Modal>
     </Stack>
   );
 }

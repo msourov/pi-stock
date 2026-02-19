@@ -6,7 +6,6 @@ import {
   Stack,
   Card,
   Container,
-  Notification,
   Image,
   Center,
 } from "@mantine/core";
@@ -14,13 +13,13 @@ import { useForm } from "@mantine/form";
 import { useLocation, useNavigate } from "react-router";
 import { IconX } from "@tabler/icons-react";
 import { useAuth } from "../../AuthProvider";
+import { notifications } from "@mantine/notifications";
 
 export const Login = () => {
   const { login, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || "/";
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm({
@@ -40,7 +39,6 @@ export const Login = () => {
     password: string;
   }) => {
     setSubmitting(true);
-    setError("");
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/role-user/login`,
@@ -56,11 +54,23 @@ export const Login = () => {
         login(data);
         navigate(from, { replace: true });
       } else {
-        setError(data.message || "Invalid user ID or password.");
+        notifications.show({
+          title: "Error",
+          message: data?.detail || "Invalid user ID or password",
+          icon: <IconX />,
+          color: "red",
+        });
+
+        // setError(data.detail || "Invalid user ID or password.");
       }
     } catch (err) {
       console.error(err);
-      setError("Something went wrong. Please try again.");
+      notifications.show({
+        title: "Error",
+        message: "Something went wrong. Please try again.",
+        icon: <IconX />,
+        color: "red",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -81,17 +91,6 @@ export const Login = () => {
               alt="Pi-Stock logo"
             />
           </Center>
-
-          {error && (
-            <Notification
-              icon={<IconX size={18} />}
-              color="red"
-              onClose={() => setError("")}
-              withCloseButton
-            >
-              {error}
-            </Notification>
-          )}
 
           <form onSubmit={form.onSubmit(handleSubmit)}>
             <Stack gap="sm">
