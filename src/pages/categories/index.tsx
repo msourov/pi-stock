@@ -10,15 +10,12 @@ import {
   Title,
   ActionIcon,
   Modal,
-  TextInput,
   Stack,
-  Grid,
 } from "@mantine/core";
 import {
   IconCategory,
   IconCheck,
   IconEdit,
-  IconInfoCircle,
   IconPlus,
   IconRefresh,
   IconTrash,
@@ -27,242 +24,70 @@ import {
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
-import { useAuth } from "../../AuthProvider";
-import { Category } from "./type";
+import useCategory from "./hooks";
+import CreateCategoryModal from "./components/CreateCategoryModal";
+import { EditCategoryModal } from "./components/EditCategoryModal";
 
 export default function Categories() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | number | null>(null);
-  const [opened, { open, close }] = useDisclosure(false);
+  const {
+    categories,
+    loading,
+    fetchCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+  } = useCategory();
 
+  const [deleting, setDeleting] = useState(false);
+
+  const [createOpened, { open: openCreate, close: closeCreate }] =
+    useDisclosure(false);
   const [editOpened, { open: openEdit, close: closeEdit }] =
     useDisclosure(false);
   const [deleteOpened, { open: openDeleteModal, close: closeDeleteModal }] =
     useDisclosure(false);
-  const [deleting, setDeleting] = useState(false);
+
   const [selectedCategory, setSelectedCategory] = useState<{
     uid: string;
     name: string;
   } | null>(null);
 
-  const { logout } = useAuth();
-
-  const companyId = "61651c07-0fe1-4cb7-9d03-b918a613a5c9";
-
-  const form = useForm({
-    initialValues: {
-      name: "",
-      company_id: companyId,
-      active: true,
-    },
-    validate: {
-      name: (v) => (!v ? "Category name is required" : null),
-    },
+  const editForm = useForm({
+    initialValues: { name: "" },
+    validate: { name: (v) => (!v.trim() ? "Category name is required" : null) },
   });
 
-  const fetchCategories = async () => {
-    setLoading(true);
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/category/all`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setCategories(data.data || []);
-      } else {
-        setCategories([]);
-      }
-      if (res.status === 401) {
-        logout();
-      }
-    } catch (err) {
-      console.error("Fetch categories error:", err);
-      setCategories([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    fetchCategories().catch(() => {});
+  }, []);
 
-  const handleCategorySubmit = async (values: {
-    name: string;
-    company_id: string;
-    active: boolean;
-  }) => {
-    setSubmitting(true);
-    const token = localStorage.getItem("token");
-
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/category/create`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-          body: JSON.stringify(values),
-        }
-      );
-
-      const result = await res.json();
-
-      if (result.success) {
-        notifications.show({
-          title: "Success",
-          message: result?.message || "Category created successfully!",
-          icon: <IconCheck />,
-          color: "teal",
-        });
-
-        form.reset();
-        close();
-        fetchCategories();
-      } else if (res.status === 401) {
-        logout();
-      } else {
-        notifications.show({
-          title: "Error",
-          message: result?.message || "Failed to create category",
-          icon: <IconX />,
-          color: "red",
-        });
-      }
-    } catch (err) {
-      console.error("Create category error:", err);
-      notifications.show({
-        title: "Something went wrong!",
-        message: "Please check your connection",
-        icon: <IconX />,
-        color: "red",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleUpdateCategory = async (
-    categoryId: string,
-    values: { name: string }
-  ) => {
-    setSubmitting(true);
-    const token = localStorage.getItem("token");
-    const payload = { ...values, uid: categoryId };
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/category/update/${categoryId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const result = await res.json();
-
-      if (result.success) {
-        notifications.show({
-          title: "Success",
-          message: result?.message || "Category updated successfully!",
-          icon: <IconCheck />,
-          color: "teal",
-        });
-
-        form.reset();
-        closeEdit();
-        fetchCategories(); // refresh category list
-      } else if (res.status === 401) {
-        logout();
-      } else {
-        notifications.show({
-          title: "Error",
-          message: result?.message || "Failed to update category",
-          icon: <IconX />,
-          color: "red",
-        });
-      }
-    } catch (err) {
-      console.error("Update category error:", err);
-      notifications.show({
-        title: "Something went wrong!",
-        message: "Please check your connection",
-        icon: <IconX />,
-        color: "red",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteCategory = async (categoryId: string) => {
-    const token = localStorage.getItem("token");
-    setDeletingId(categoryId);
+  const handleDeleteCategory = async () => {
+    if (!selectedCategory) return;
     setDeleting(true);
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/category/delete/${categoryId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        }
-      );
-
-      const result = await res.json();
-
-      if (res.ok) {
-        notifications.show({
-          title: "Deleted",
-          message: result?.message || "Category deleted successfully!",
-          icon: <IconCheck />,
-          color: "teal",
-        });
-        setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
-        fetchCategories();
-        closeDeleteModal();
-      } else if (res.status === 401) {
-        logout();
-      } else {
-        notifications.show({
-          title: "Error",
-          message: result?.message || "Failed to delete category",
-          icon: <IconX />,
-          color: "red",
-        });
-      }
-    } catch (err) {
-      console.error("Delete category error:", err);
+      const result = await deleteCategory(selectedCategory.uid);
       notifications.show({
-        title: "Network Error",
-        message: "Failed to connect to server",
-        icon: <IconX />,
+        title: "Deleted",
+        message: result.message,
+        color: "teal",
+        icon: <IconCheck size={16} />,
+      });
+      closeDeleteModal();
+      await fetchCategories();
+    } catch (err: unknown) {
+      notifications.show({
+        title: "Error",
+        message: err instanceof Error ? err.message : "An error occurred",
         color: "red",
+        icon: <IconX size={16} />,
       });
     } finally {
-      setDeletingId(null);
       setDeleting(false);
     }
   };
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
   return (
     <Stack p="xs" gap="sm">
-      {/* Header Section */}
       <Card
         withBorder
         shadow="xs"
@@ -284,74 +109,17 @@ export default function Categories() {
           </div>
           <Button
             leftSection={<IconPlus size={14} />}
-            onClick={open}
+            onClick={openCreate}
             size="xs"
             radius="sm"
-            color="purple"
+            color="indigo"
           >
             Add Category
           </Button>
         </Group>
       </Card>
 
-      {/* Stats Cards */}
-      <Grid gutter="sm">
-        {[
-          {
-            color: "#4299e1",
-            label: "Total Categories",
-            value: categories.length,
-            icon: <IconCategory size={16} color="#4299e1" />,
-          },
-          {
-            color: "#48bb78",
-            label: "Active Categories",
-            value: categories.filter((c) => c.active).length,
-            icon: <IconCheck size={16} color="#48bb78" />,
-          },
-          {
-            color: "#9f7aea",
-            label: "With Additional Info",
-            value: categories.filter((c) => c.info1).length,
-            icon: <IconInfoCircle size={16} color="#9f7aea" />,
-          },
-        ].map(({ color, label, value, icon }, index) => (
-          <Grid.Col key={index} span={{ base: 12, sm: 6, lg: 3 }}>
-            <Card
-              withBorder
-              p="sm"
-              radius="sm"
-              style={{
-                borderLeft: `3px solid ${color}`,
-                background: "white",
-              }}
-            >
-              <Group gap={6} align="flex-start">
-                <Box
-                  p={6}
-                  style={{
-                    background: `${color}1A`,
-                    borderRadius: 6,
-                  }}
-                >
-                  {icon}
-                </Box>
-                <div style={{ flex: 1 }}>
-                  <Text fz="xs" c="dimmed" fw={500}>
-                    {label}
-                  </Text>
-                  <Text fz="lg" fw={700} c="dark.4">
-                    {value}
-                  </Text>
-                </div>
-              </Group>
-            </Card>
-          </Grid.Col>
-        ))}
-      </Grid>
-
-      {/* Table Section */}
-      <Card withBorder radius="md" style={{ background: "white" }}>
+      <Card withBorder radius="md" mt={8} style={{ background: "white" }}>
         <Group justify="space-between" mb="xs" px="xs" pb={4}>
           <Title order={5} c="dark.4">
             Category List
@@ -359,7 +127,7 @@ export default function Categories() {
           <Button
             variant="light"
             leftSection={<IconRefresh size={14} />}
-            onClick={fetchCategories}
+            onClick={() => fetchCategories().catch(() => {})}
             disabled={loading}
             size="xs"
           >
@@ -386,14 +154,14 @@ export default function Categories() {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Name</Table.Th>
-                  <Table.Th>Additional Info</Table.Th>
+                  <Table.Th>Type</Table.Th>
                   <Table.Th style={{ textAlign: "center" }}>Actions</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {categories.length === 0 ? (
                   <Table.Tr>
-                    <Table.Td colSpan={5} py="lg" ta="center">
+                    <Table.Td colSpan={3} py="lg" ta="center">
                       <Box>
                         <IconCategory size={36} color="gray" />
                         <Text mt={4} c="dimmed" fz="sm">
@@ -407,17 +175,16 @@ export default function Categories() {
                   </Table.Tr>
                 ) : (
                   categories.map((category) => (
-                    <Table.Tr key={category.id}>
+                    <Table.Tr key={category.uid}>
                       <Table.Td>
                         <Text fw={600} fz="sm">
                           {category.name}
                         </Text>
-                        <Text fz="xs" c="dimmed">
-                          ID: {category.id}
-                        </Text>
                       </Table.Td>
                       <Table.Td>
-                        <Text size="sm">{category.info1 || "-"}</Text>
+                        <Text fz="sm" c="dimmed">
+                          {category.category_type || "-"}
+                        </Text>
                       </Table.Td>
                       <Table.Td>
                         <Group gap={4} justify="center">
@@ -431,19 +198,20 @@ export default function Categories() {
                                 uid: category.uid,
                                 name: category.name,
                               });
-                              form.setValues({ name: category.name });
+                              editForm.setValues({ name: category.name });
                               openEdit();
                             }}
                           >
                             <IconEdit size={14} />
                           </ActionIcon>
-
                           <ActionIcon
                             variant="subtle"
                             color="red"
                             size="sm"
                             radius="sm"
-                            loading={deletingId === category.uid}
+                            loading={
+                              deleting && selectedCategory?.uid === category.uid
+                            }
                             onClick={() => {
                               setSelectedCategory({
                                 uid: category.uid,
@@ -463,132 +231,58 @@ export default function Categories() {
             </Table>
           </Box>
         )}
-
-        {/* Create Category Modal */}
-        <Modal
-          opened={opened}
-          onClose={close}
-          centered
-          size="sm"
-          title={
-            <Title order={4} c="gray">
-              Add New Category
-            </Title>
-          }
-          overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
-        >
-          <form onSubmit={form.onSubmit(handleCategorySubmit)}>
-            <Stack gap="md">
-              <TextInput
-                label="Category Name"
-                placeholder="Enter category name"
-                withAsterisk
-                {...form.getInputProps("name")}
-              />
-              <Group justify="flex-end" mt="xl">
-                <Button variant="outline" onClick={close} disabled={submitting}>
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  loading={submitting}
-                  leftSection={<IconPlus size={18} />}
-                >
-                  Create Category
-                </Button>
-              </Group>
-            </Stack>
-          </form>
-        </Modal>
-        {/* Category Update Modal */}
-        <Modal
-          opened={editOpened}
-          onClose={closeEdit}
-          centered
-          size="sm"
-          title={
-            <Title order={4} c="gray">
-              Edit Category
-            </Title>
-          }
-          overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
-        >
-          <form
-            onSubmit={form.onSubmit((values) => {
-              if (selectedCategory)
-                handleUpdateCategory(selectedCategory.uid, values);
-            })}
-          >
-            <Stack gap="md">
-              <TextInput
-                label="Category Name"
-                placeholder="Enter new category name"
-                withAsterisk
-                {...form.getInputProps("name")}
-              />
-              <Group justify="flex-end" mt="xl">
-                <Button
-                  variant="outline"
-                  onClick={closeEdit}
-                  disabled={submitting}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  loading={submitting}
-                  leftSection={<IconCheck size={18} />}
-                >
-                  Update Category
-                </Button>
-              </Group>
-            </Stack>
-          </form>
-        </Modal>
-        {/* Delete Category Modal */}
-        <Modal
-          opened={deleteOpened}
-          onClose={closeDeleteModal}
-          centered
-          size="sm"
-          transitionProps={{
-            transition: "fade",
-            duration: 200,
-            timingFunction: "linear",
-          }}
-          withCloseButton={false}
-        >
-          <Box ta="center" p="md">
-            <Text fw={600} size="lg" c="dark">
-              Delete Category?
-            </Text>
-            <Text size="sm" c="dimmed" mt={4}>
-              Are you sure you want to delete this category? This action cannot
-              be undone.
-            </Text>
-
-            <Group justify="center" mt="lg">
-              <Button
-                variant="default"
-                onClick={closeDeleteModal}
-                disabled={deleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                color="red"
-                loading={deleting}
-                onClick={() => {
-                  if (!selectedCategory?.uid) return;
-                  handleDeleteCategory(selectedCategory.uid);
-                }}
-              >
-                Delete
-              </Button>
-            </Group>
-          </Box>
-        </Modal>
       </Card>
+
+      <CreateCategoryModal
+        opened={createOpened}
+        onClose={closeCreate}
+        onCreate={createCategory}
+        onSuccess={() => fetchCategories().catch(() => {})}
+      />
+
+      <EditCategoryModal
+        opened={editOpened}
+        onClose={closeEdit}
+        category={selectedCategory}
+        onUpdate={updateCategory}
+        onSuccess={() => fetchCategories()}
+      />
+
+      <Modal
+        opened={deleteOpened}
+        onClose={closeDeleteModal}
+        centered
+        size="sm"
+        withCloseButton={false}
+        transitionProps={{ transition: "fade", duration: 200 }}
+      >
+        <Box ta="center" p="md">
+          <Text fw={600} size="lg" c="dark">
+            Delete Category?
+          </Text>
+          <Text size="sm" c="dimmed" mt={4}>
+            Are you sure you want to delete{" "}
+            <strong>{selectedCategory?.name}</strong>? This action cannot be
+            undone.
+          </Text>
+          <Group justify="center" mt="lg">
+            <Button
+              variant="default"
+              onClick={closeDeleteModal}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              loading={deleting}
+              onClick={handleDeleteCategory}
+            >
+              Delete
+            </Button>
+          </Group>
+        </Box>
+      </Modal>
     </Stack>
   );
 }
