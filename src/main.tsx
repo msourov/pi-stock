@@ -14,6 +14,7 @@ import "@mantine/notifications/styles.css";
 import "@mantine/core/styles.css";
 import "@mantine/dates/styles.css";
 import "./index.css";
+import CheckChepPage from "./pages/audit/index.tsx";
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +46,10 @@ export const router = createBrowserRouter([
         element: <Stock />,
       },
       {
+        path: "chep-audit",
+        element: <CheckChepPage />,
+      },
+      {
         path: "dashboard",
         element: <div>Dashboard</div>,
       },
@@ -61,9 +66,9 @@ createRoot(document.getElementById("root")!).render(
       }}
     >
       <AuthProvider>
-        <Notifications />
+        <Notifications position="bottom-right" />
         <RouterProvider router={router} />
       </AuthProvider>
     </MantineProvider>
-  </StrictMode>
+  </StrictMode>,
 );

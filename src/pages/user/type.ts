@@ -22,26 +22,18 @@ export interface User {
 export interface CreateUserPayload {
   name: string;
   user_id: string;
-  mobile_number: string;
-  company_id: string;
-  branch_id: string;
   email: string;
   password: string;
   role_id: string;
-  company_admin: boolean;
   active: boolean;
 }
 
 export interface UpdateUserPayload {
   uid: string;
   name: string;
-  active: boolean;
-  company_id: string;
-  branch_id: string;
-  role: string;
   email: string;
-  company_admin: boolean;
-  mobile_number: string;
+  role_id: string;
+  active: boolean;
 }
 
 export interface UserFormData {

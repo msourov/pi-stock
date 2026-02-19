@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import {
   Transaction,
   CreateTransactionPayload,
-  UpdateTransactionPayload,
   OpenStockPayload,
+  WriteOffPayload,
 } from "./types";
 import {
   Package,
@@ -20,8 +20,6 @@ import {
   Eye,
   ChevronDown,
   FilePenLine,
-  TreePine,
-  Layers,
 } from "lucide-react";
 import CreateTransactionModal from "./components/CreateTransactionModal";
 import OpenStockModal from "./components/OpenStockModal";
@@ -29,6 +27,13 @@ import EditTransactionModal from "./components/EditTransactionModal";
 import { useTransactions } from "./hooks";
 import { useAuth } from "../../AuthProvider";
 import WriteOffModal from "./components/WriteOffModal";
+import TransactionDetailPage from "./TransactionDetailPage";
+import { StockSummaryCard } from "./components/StockSummaryCard";
+import {
+  getTransactionTypeBadge,
+  formatDate,
+  filterTransactions,
+} from "../../utils/transactionUtils";
 
 type ModalType = "create" | "openStock" | "edit" | "writeOff" | null;
 
@@ -41,6 +46,10 @@ const TransactionPage = () => {
     loading,
     error,
     totalCount,
+    stock,
+    stockLoading,
+    stockError,
+    fetchStockStat,
     fetchTransactions,
     createTransaction,
     createOpenStock,
@@ -49,15 +58,22 @@ const TransactionPage = () => {
   } = useTransactions({ token, logout });
 
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
+  const [pageInputValue, setPageInputValue] = useState("1");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
   const [viewDetailsId, setViewDetailsId] = useState<string | null>(null);
-
-  // Modal state
   const [modalType, setModalType] = useState<ModalType>(null);
+  const [detailUid, setDetailUid] = useState<string | null>(null);
+
+  // Sync page input with page state
+  useEffect(() => {
+    setPageInputValue(String(page));
+  }, [page]);
 
   useEffect(() => {
     if (token) {
@@ -65,7 +81,27 @@ const TransactionPage = () => {
     }
   }, [page, limit, token, fetchTransactions]);
 
-  // Modal handlers
+  // Hide opening stock button if any opening_stock transaction already exists
+  const hasOpeningStock = transactions.some(
+    (t) => t.t_type === "opening_stock",
+  );
+
+  const filteredTransactions = filterTransactions(
+    transactions,
+    filterType,
+    searchTerm,
+  ).filter((t) => {
+    if (!startDate && !endDate) return true;
+    const txDate = new Date(t.stock_date);
+    if (startDate && txDate < new Date(startDate)) return false;
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      if (txDate > end) return false;
+    }
+    return true;
+  });
+
   const openCreateModal = () => {
     setSelectedTransaction(null);
     setModalType("create");
@@ -96,56 +132,114 @@ const TransactionPage = () => {
     closeModal();
   };
 
-  const getTransactionTypeBadge = (type: string) => {
-    const badges: Record<string, { bg: string; text: string }> = {
-      inbound: { bg: "bg-emerald-100", text: "text-emerald-700" },
-      outbound: { bg: "bg-rose-100", text: "text-rose-700" },
-      opening_stock: { bg: "bg-amber-100", text: "text-amber-700" },
-      adjustment: { bg: "bg-blue-100", text: "text-blue-700" },
-      write_off: { bg: "bg-slate-100", text: "text-slate-700" },
-    };
-    const badge = badges[type] || { bg: "bg-gray-100", text: "text-gray-700" };
-    return (
-      <span
-        className={`${badge.bg} ${badge.text} px-2 py-0.5 rounded text-xs font-medium`}
-      >
-        {type.replace("_", " ")}
-      </span>
-    );
+  const handlePageInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const val = parseInt(pageInputValue, 10);
+      if (!isNaN(val) && val >= 1 && val <= totalPages) {
+        setPage(val);
+      } else {
+        setPageInputValue(String(page));
+      }
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const handleLimitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLimit(Number(e.target.value));
+    setPage(1);
   };
-
-  const filteredTransactions = transactions.filter((t) => {
-    const matchesType = filterType === "all" || t.t_type === filterType;
-    const matchesSearch =
-      searchTerm === "" ||
-      t.chep_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.from_where.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.to_where.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesType && matchesSearch;
-  });
 
   const totalPages = Math.ceil(totalCount / limit);
 
-  // Calculate stock totals
-  const stockTotals = transactions.reduce(
-    (acc, t) => ({
-      fb4: acc.fb4 + (t.total_fb4_stock || 0),
-      plastic: acc.plastic + (t.total_plastic_stock || 0),
-      wood: acc.wood + (t.total_wood_stock || 0),
-    }),
-    { fb4: 0, plastic: 0, wood: 0 },
-  );
+  // Render the flow cell based on transaction type
+  const renderFlow = (tx: Transaction) => {
+    const { t_type, from_where, to_where } = tx;
+
+    if (t_type === "inbound") {
+      // EP always on left: EP ← from_where
+      return (
+        <div className="flex items-center gap-1 text-xs">
+          <span className="font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+            {to_where}
+          </span>
+          <span className="text-emerald-500 font-bold">←</span>
+          <span className="text-gray-600">{from_where}</span>
+        </div>
+      );
+    }
+
+    if (t_type === "outbound") {
+      // EP always on left: EP → to_where
+      return (
+        <div className="flex items-center gap-1 text-xs">
+          <span className="font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded">
+            {from_where}
+          </span>
+          <span className="text-rose-500 font-bold">→</span>
+          <span className="text-gray-600">{to_where}</span>
+        </div>
+      );
+    }
+
+    // adjustment / opening_stock / write_off — neutral display
+    return (
+      <div className="flex items-center gap-1 text-xs">
+        <span className="font-medium text-gray-600">{from_where}</span>
+        <span className="text-gray-400">↔</span>
+        <span className="font-medium text-gray-600">{to_where}</span>
+      </div>
+    );
+  };
+
+  if (detailUid) {
+    return (
+      <>
+        <TransactionDetailPage
+          uid={detailUid}
+          token={token}
+          logout={logout}
+          onBack={() => setDetailUid(null)}
+          onEdit={(tx) => {
+            setDetailUid(null);
+            openEditModal(tx);
+          }}
+          onWriteOff={(tx) => {
+            setDetailUid(null);
+            openWriteOffModal(tx);
+          }}
+        />
+        {modalType === "edit" && selectedTransaction && (
+          <EditTransactionModal
+            transaction={selectedTransaction}
+            opened={true}
+            onSubmit={async (data) => {
+              const fixedData = {
+                ...data,
+                t_type: data.t_type as
+                  | "inbound"
+                  | "outbound"
+                  | "adjustment_inbound"
+                  | "adjustment_outbound",
+              };
+              await updateTransaction(fixedData);
+              handleSuccess();
+            }}
+            onClose={closeModal}
+          />
+        )}
+        {modalType === "writeOff" && selectedTransaction && (
+          <WriteOffModal
+            transaction={selectedTransaction}
+            opened={true}
+            onSubmit={async (data: WriteOffPayload) => {
+              await writeOffTransaction(data);
+              handleSuccess();
+            }}
+            onClose={closeModal}
+          />
+        )}
+      </>
+    );
+  }
 
   if (loading && transactions.length === 0) {
     return (
@@ -161,17 +255,15 @@ const TransactionPage = () => {
   }
 
   return (
-<div className="min-h-screen bg-gray-50 p-3">
+    <div className="min-h-screen bg-gray-50 p-3">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        * {
-          font-family: 'Inter', sans-serif;
-        }
+        * { font-family: 'Inter', sans-serif; }
       `}</style>
 
       <div className="max-w-[1600px] mx-auto">
-        {/* Compact Header */}
         <div className="mb-3">
+          {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <div>
               <h1 className="text-xl font-bold text-gray-900">
@@ -198,13 +290,16 @@ const TransactionPage = () => {
                 <Plus className="w-3.5 h-3.5" />
                 New
               </button>
-              <button
-                onClick={openOpenStockModal}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Opening
-              </button>
+              {/* Hide Opening button if an opening_stock transaction already exists */}
+              {!hasOpeningStock && (
+                <button
+                  onClick={openOpenStockModal}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Opening
+                </button>
+              )}
               <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800">
                 <Download className="w-3.5 h-3.5" />
                 Export
@@ -212,7 +307,7 @@ const TransactionPage = () => {
             </div>
           </div>
 
-          {/* Error Message */}
+          {/* Error */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
@@ -225,66 +320,19 @@ const TransactionPage = () => {
             </div>
           )}
 
-          {/* Redesigned Stats Cards - Mantine style */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            {[
-              { 
-                label: "FB4", 
-                value: stockTotals.fb4, 
-                color: "blue", 
-                icon: Package,
-                borderColor: "border-l-blue-500",
-                bgColor: "bg-blue-50",
-                textColor: "text-blue-600"
-              },
-              { 
-                label: "Plastic", 
-                value: stockTotals.plastic, 
-                color: "emerald", 
-                icon: Layers,
-                borderColor: "border-l-emerald-500",
-                bgColor: "bg-emerald-50",
-                textColor: "text-emerald-600"
-              },
-              { 
-                label: "Wood", 
-                value: stockTotals.wood, 
-                color: "amber", 
-                icon: TreePine,
-                borderColor: "border-l-amber-500",
-                bgColor: "bg-amber-50",
-                textColor: "text-amber-600"
-              },
-            ].map((stat, idx) => {
-              const Icon = stat.icon;
-              return (
-                <div
-                  key={idx}
-                  className={`bg-white border border-gray-200 rounded-lg p-3 border-l-4 ${stat.borderColor}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded ${stat.bgColor}`}>
-                      <Icon className={`w-4 h-4 ${stat.textColor}`} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-xs font-medium text-gray-500 uppercase">
-                        {stat.label} Total
-                      </div>
-                      <div className="text-xl font-bold text-gray-800">
-                        {stat.value.toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <StockSummaryCard
+            stock={stock}
+            loading={stockLoading}
+            error={stockError}
+            onRefresh={fetchStockStat}
+          />
 
-          {/* Compact Filters */}
+          {/* Filters */}
           <div className="bg-white rounded-lg p-2.5 border border-gray-200 mb-3">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <div className="flex flex-wrap gap-2">
+              {/* Search */}
+              <div className="flex-1 min-w-[180px] relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search by ID, location..."
@@ -293,6 +341,42 @@ const TransactionPage = () => {
                   className="w-full pl-8 pr-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+
+              {/* Date range */}
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-gray-500 whitespace-nowrap">
+                  From
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <label className="text-xs text-gray-500 whitespace-nowrap">
+                  To
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                    }}
+                    className="text-xs text-gray-400 hover:text-gray-600 px-1"
+                    title="Clear dates"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Type filter buttons */}
               <div className="flex gap-1">
                 {["all", "inbound", "outbound", "opening_stock"].map((type) => (
                   <button
@@ -312,7 +396,7 @@ const TransactionPage = () => {
           </div>
         </div>
 
-        {/* Compact Table */}
+        {/* Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -325,7 +409,7 @@ const TransactionPage = () => {
                     Type
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">
-                    From → To
+                    Flow
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">
                     Date
@@ -360,20 +444,17 @@ const TransactionPage = () => {
                 )}
                 {filteredTransactions.map((tx) => (
                   <React.Fragment key={tx.uid}>
-                    <tr className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => setDetailUid(tx.uid)}
+                    >
                       <td className="px-3 py-2 font-mono text-xs text-gray-900">
                         {tx.chep_id}
                       </td>
                       <td className="px-3 py-2">
                         {getTransactionTypeBadge(tx.t_type)}
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-700">
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">{tx.from_where}</span>
-                          <span className="text-gray-400">→</span>
-                          <span className="font-medium">{tx.to_where}</span>
-                        </div>
-                      </td>
+                      <td className="px-3 py-2">{renderFlow(tx)}</td>
                       <td className="px-3 py-2 text-xs text-gray-600">
                         {formatDate(tx.stock_date)}
                       </td>
@@ -392,11 +473,12 @@ const TransactionPage = () => {
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setViewDetailsId(
                                 viewDetailsId === tx.uid ? null : tx.uid,
-                              )
-                            }
+                              );
+                            }}
                             className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="View details"
                           >
@@ -407,14 +489,20 @@ const TransactionPage = () => {
                             )}
                           </button>
                           <button
-                            onClick={() => openEditModal(tx)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(tx);
+                            }}
                             className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="Edit"
                           >
                             <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => openWriteOffModal(tx)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openWriteOffModal(tx);
+                            }}
                             className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="Write off"
                           >
@@ -550,7 +638,6 @@ const TransactionPage = () => {
             </table>
           </div>
 
-          {/* Empty State */}
           {!loading && filteredTransactions.length === 0 && (
             <div className="text-center py-8">
               <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
@@ -564,30 +651,57 @@ const TransactionPage = () => {
           )}
         </div>
 
-        {/* Compact Pagination */}
+        {/* Pagination */}
         {!loading && filteredTransactions.length > 0 && (
-          <div className="mt-3 flex items-center justify-between bg-white rounded-lg p-2.5 border border-gray-200">
-            <div className="text-xs text-gray-600">
-              Showing{" "}
-              <span className="font-medium">{(page - 1) * limit + 1}</span>-
-              <span className="font-medium">
-                {Math.min(page * limit, totalCount)}
-              </span>{" "}
-              of <span className="font-medium">{totalCount}</span>
+          <div className="mt-3 flex items-center justify-between bg-white rounded-lg p-2.5 border border-gray-200 flex-wrap gap-2">
+            {/* Left: count info + rows per page */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-600">
+                Showing{" "}
+                <span className="font-medium">{(page - 1) * limit + 1}</span>–
+                <span className="font-medium">
+                  {Math.min(page * limit, totalCount)}
+                </span>{" "}
+                of <span className="font-medium">{totalCount}</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-gray-500">Rows:</label>
+                <select
+                  value={limit}
+                  onChange={handleLimitChange}
+                  className="border border-gray-300 rounded-md px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {[5, 10, 20, 50, 100].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
+            {/* Right: page controls */}
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+                className="p-1.5 text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+                title="First page"
+              >
+                «
+              </button>
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="p-1.5 text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1.5 text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
 
+              {/* Numbered pages */}
               <div className="flex items-center gap-0.5">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
+                  let pageNum: number;
                   if (totalPages <= 5) {
                     pageNum = i + 1;
                   } else if (page <= 3) {
@@ -597,7 +711,6 @@ const TransactionPage = () => {
                   } else {
                     pageNum = page - 2 + i;
                   }
-
                   return (
                     <button
                       key={pageNum}
@@ -617,10 +730,33 @@ const TransactionPage = () => {
               <button
                 onClick={() => setPage(Math.min(totalPages, page + 1))}
                 disabled={page >= totalPages}
-                className="p-1.5 text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1.5 text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages}
+                className="p-1.5 text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+                title="Last page"
+              >
+                »
+              </button>
+
+              {/* Direct page jump */}
+              <div className="flex items-center gap-1 ml-2">
+                <label className="text-xs text-gray-500">Go to</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={pageInputValue}
+                  onChange={(e) => setPageInputValue(e.target.value)}
+                  onKeyDown={handlePageInput}
+                  className="w-12 border border-gray-300 rounded-md px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="Type a page number and press Enter"
+                />
+              </div>
             </div>
           </div>
         )}
@@ -650,7 +786,6 @@ const TransactionPage = () => {
                 ? data.stock_date.toISOString()
                 : new Date().toISOString(),
             };
-
             await createOpenStock(payload);
             handleSuccess();
           }}
@@ -662,8 +797,16 @@ const TransactionPage = () => {
         <EditTransactionModal
           transaction={selectedTransaction}
           opened={true}
-          onSubmit={async (data: UpdateTransactionPayload) => {
-            await updateTransaction(data);
+          onSubmit={async (data) => {
+            const fixedData = {
+              ...data,
+              t_type: data.t_type as
+                | "inbound"
+                | "outbound"
+                | "adjustment_inbound"
+                | "adjustment_outbound",
+            };
+            await updateTransaction(fixedData);
             handleSuccess();
           }}
           onClose={closeModal}
@@ -674,7 +817,7 @@ const TransactionPage = () => {
         <WriteOffModal
           transaction={selectedTransaction}
           opened={true}
-          onSubmit={async (data) => {
+          onSubmit={async (data: WriteOffPayload) => {
             await writeOffTransaction(data);
             handleSuccess();
           }}

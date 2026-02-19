@@ -16,7 +16,7 @@ import {
   IconChevronDown,
   IconCategory,
   IconBell,
-  IconBuildingStore,
+  IconClipboardCheck,
 } from "@tabler/icons-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../AuthProvider";
@@ -30,13 +30,13 @@ const MainLayout = () => {
   const menuItems = [
     { icon: IconBuilding, label: "Dashboard", path: "/dashboard" },
     { icon: IconUser, label: "Users", path: "/users" },
-    { icon: IconBuildingStore, label: "Branches", path: "/branches" },
     {
       icon: IconCategory,
       label: "Categories",
       path: "/categories",
     },
     { icon: IconTrendingUp, label: "Stocks", path: "/stocks" },
+    { icon: IconClipboardCheck, label: "Chep Audit", path: "/chep-audit" }, // Added Audit item
     // { icon: IconReceipt, label: "Orders", path: "/orders" },
   ];
 
@@ -130,7 +130,6 @@ const MainLayout = () => {
           </Group>
         </Group>
 
-        {/* Navigation Menu Bar */}
         <div
           className="mx-auto mt-2 flex justify-center items-center"
           style={{ borderTop: "1px solid #f1f5f9" }}
@@ -142,73 +141,6 @@ const MainLayout = () => {
               location.pathname === item.path ||
               (item.path !== "/dashboard" &&
                 location.pathname.startsWith(item.path));
-
-            // if (hasChildren) {
-            //   return (
-            //     <Menu
-            //       key={item.path}
-            //       shadow="md"
-            //       width={220}
-            //       position="bottom-start"
-            //     >
-            //       <Menu.Target>
-            //         <UnstyledButton>
-            //           <Group
-            //             gap="xs"
-            //             style={{
-            //               padding: "6px 12px",
-            //               borderRadius: "6px",
-            //               transition: "all 0.2s ease",
-            //             }}
-            //           >
-            //             <Icon
-            //               size={18}
-            //               color={isActive ? "purple" : "#64748b"}
-            //             />
-            //             <Text
-            //               style={{
-            //                 color: isActive ? "purple" : "#64748b",
-            //                 fontWeight: isActive ? 600 : 400,
-            //                 fontSize: "14px",
-            //               }}
-            //             >
-            //               {item.label}
-            //             </Text>
-            //             <IconChevronDown
-            //               size={14}
-            //               color={isActive ? "purple" : "#64748b"}
-            //             />
-            //           </Group>
-            //         </UnstyledButton>
-            //       </Menu.Target>
-
-            //       <Menu.Dropdown>
-            //         <Menu.Label>{item.label}</Menu.Label>
-            //         {item.children.map((child) => {
-            //           const ChildIcon = child.icon;
-            //           const isChildActive = location.pathname === child.path;
-            //           return (
-            //             <Menu.Item
-            //               key={child.path}
-            //               leftSection={<ChildIcon size={16} />}
-            //               onClick={() => navigate(child.path)}
-            //               style={{
-            //                 backgroundColor: isChildActive
-            //                   ? "rgba(99, 102, 241, 0.1)"
-            //                   : "transparent",
-            //                 fontWeight: isChildActive ? 600 : 400,
-            //                 color: isChildActive ? "#6366f1" : "#334155",
-            //               }}
-            //             >
-            //               {child.label}
-            //             </Menu.Item>
-            //           );
-            //         })}
-            //       </Menu.Dropdown>
-            //     </Menu>
-            //   );
-            // }
-
             return (
               <UnstyledButton
                 key={item.path}
@@ -239,12 +171,11 @@ const MainLayout = () => {
         </div>
       </AppShell.Header>
 
-      {/* Main content area */}
       <AppShell.Main
         style={{
           background: "#f8fafc",
           paddingInline: 0,
-          paddingTop: "100px",
+          paddingTop: "110px",
           minHeight: "calc(100vh - 100px)",
         }}
       >

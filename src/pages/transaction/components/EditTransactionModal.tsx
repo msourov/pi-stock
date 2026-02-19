@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+// Fixed: aligned with actual API payload
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   Modal,
@@ -8,20 +9,32 @@ import {
   Button,
   Stack,
   Group,
+  Text,
+  Select,
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
 import { Transaction } from "../types";
 
-interface UpdateTransactionPayload {
+export interface UpdateTransactionPayload {
   uid: string;
-  chep_id: string;
+  comment?: string;
   from_where: string;
   to_where: string;
+  t_type: string;
+  fb4_stock: number;
+  plastic_stock: number;
+  wood_stock: number;
   stock_date: string;
+}
+
+interface FormValues {
+  from_where: string;
+  to_where: string;
+  t_type: string;
+  fb4_stock: number;
+  plastic_stock: number;
+  wood_stock: number;
   comment?: string;
-  fb4_close_stock?: number;
-  plastic_close_stock?: number;
-  wood_close_stock?: number;
 }
 
 interface Props {
@@ -31,130 +44,161 @@ interface Props {
   onClose: () => void;
 }
 
+const T_TYPE_OPTIONS = [
+  { value: "inbound", label: "Inbound" },
+  { value: "outbound", label: "Outbound" },
+  { value: "adjustment_inbound", label: "Adjust Positive" },
+  { value: "adjustment_outbound", label: "Adjust Negative" },
+];
+
 const EditTransactionModal: React.FC<Props> = ({
   transaction,
   opened,
   onSubmit,
   onClose,
 }) => {
+  const [stockDate, setStockDate] = useState<Date | null>(null);
+
   const {
     register,
     handleSubmit,
     setValue,
     watch,
     reset,
-    formState: { isSubmitting },
-  } = useForm<UpdateTransactionPayload>();
+    formState: { isSubmitting, errors },
+  } = useForm<FormValues>();
 
-  // Update form values when modal opens or transaction changes
   useEffect(() => {
     if (transaction && opened) {
-      const formData = {
-        uid: transaction.uid,
-        chep_id: transaction.chep_id,
+      reset({
         from_where: transaction.from_where,
         to_where: transaction.to_where,
-        stock_date: transaction.stock_date,
+        t_type: transaction.t_type,
+        fb4_stock: transaction.total_fb4_stock ?? 0,
+        plastic_stock: transaction.total_plastic_stock ?? 0,
+        wood_stock: transaction.total_wood_stock ?? 0,
         comment: transaction.comment || "",
-        fb4_close_stock: transaction.fb4_close_stock ?? undefined,
-        plastic_close_stock: transaction.plastic_close_stock ?? undefined,
-        wood_close_stock: transaction.wood_close_stock ?? undefined,
-      };
+      });
 
-      reset(formData as UpdateTransactionPayload);
+      setStockDate(
+        transaction.stock_date ? new Date(transaction.stock_date) : new Date(),
+      );
     }
   }, [transaction, opened, reset]);
 
   const submitHandler = handleSubmit(async (data) => {
-    try {
-      const payload: UpdateTransactionPayload = {
-        uid: transaction.uid,
-        chep_id: data.chep_id,
-        from_where: data.from_where,
-        to_where: data.to_where,
-        stock_date: data.stock_date
-          ? new Date(data.stock_date).toISOString()
-          : new Date().toISOString(),
-        comment: data.comment || undefined,
-        fb4_close_stock: data.fb4_close_stock
-          ? Number(data.fb4_close_stock)
-          : undefined,
-        plastic_close_stock: data.plastic_close_stock
-          ? Number(data.plastic_close_stock)
-          : undefined,
-        wood_close_stock: data.wood_close_stock
-          ? Number(data.wood_close_stock)
-          : undefined,
-      };
+    const payload: UpdateTransactionPayload = {
+      uid: transaction.uid,
+      from_where: data.from_where,
+      to_where: data.to_where,
+      t_type: data.t_type,
+      fb4_stock: Number(data.fb4_stock),
+      plastic_stock: Number(data.plastic_stock),
+      wood_stock: Number(data.wood_stock),
+      stock_date: stockDate
+        ? stockDate.toISOString()
+        : new Date().toISOString(),
+      comment: data.comment || undefined,
+    };
 
-      await onSubmit(payload);
-      onClose();
-    } catch (error) {
-      console.error("Error updating transaction:", error);
-    }
+    await onSubmit(payload);
   });
-
-  // Helper to parse date for the DateTimePicker
-  const getDateValue = () => {
-    const dateValue = watch("stock_date");
-    if (!dateValue) return null;
-    const date = new Date(dateValue as string);
-    return isNaN(date.getTime()) ? null : date;
-  };
 
   return (
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Edit Transaction"
+      title={<Text fw={600}>Edit Transaction</Text>}
       centered
       size="lg"
-      overlayProps={{
-        opacity: 0.55,
-        blur: 3,
-      }}
+      overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
     >
       <form onSubmit={submitHandler}>
         <Stack gap="md">
-          {/* Hidden UID field */}
-          <input type="hidden" {...register("uid")} />
-
-          {/* Basic Information */}
-          <TextInput
-            label="Chep ID"
-            placeholder="Enter Chep ID"
-            {...register("chep_id", { required: "Chep ID is required" })}
+          <Select
+            label="Transaction Type"
+            placeholder="Select type"
+            withAsterisk
+            data={T_TYPE_OPTIONS}
+            value={watch("t_type")}
+            onChange={(val) =>
+              setValue("t_type", val ?? "", {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
+            error={errors.t_type?.message}
           />
 
           <Group grow>
             <TextInput
               label="From"
               placeholder="Origin location"
+              withAsterisk
+              error={errors.from_where?.message}
               {...register("from_where", { required: "Origin is required" })}
             />
             <TextInput
               label="To"
               placeholder="Destination location"
+              withAsterisk
+              error={errors.to_where?.message}
               {...register("to_where", { required: "Destination is required" })}
             />
           </Group>
 
-          {/* Stock Date - FIXED */}
           <DateTimePicker
             label="Stock Date"
             placeholder="Select date and time"
-            value={getDateValue()}
-            onChange={(date) => {
-              // Store the date value properly
-              setValue("stock_date", date ? date.toString() : "", {
-                shouldValidate: true,
-                shouldDirty: true,
-              });
-            }}
+            value={stockDate}
+            onChange={(date) => setStockDate(new Date(date))}
             clearable
           />
 
-          {/* Comment */}
+          <div>
+            <Text fz="sm" fw={500} mb={8}>
+              Stock Quantities
+            </Text>
+            <Group grow>
+              <NumberInput
+                label="FB4"
+                placeholder="0"
+                min={0}
+                value={watch("fb4_stock") ?? 0}
+                onChange={(val) =>
+                  setValue("fb4_stock", typeof val === "number" ? val : 0, {
+                    shouldDirty: true,
+                  })
+                }
+                allowNegative={false}
+              />
+              <NumberInput
+                label="Plastic"
+                placeholder="0"
+                min={0}
+                value={watch("plastic_stock") ?? 0}
+                onChange={(val) =>
+                  setValue("plastic_stock", typeof val === "number" ? val : 0, {
+                    shouldDirty: true,
+                  })
+                }
+                allowNegative={false}
+              />
+              <NumberInput
+                label="Wood"
+                placeholder="0"
+                min={0}
+                value={watch("wood_stock") ?? 0}
+                onChange={(val) =>
+                  setValue("wood_stock", typeof val === "number" ? val : 0, {
+                    shouldDirty: true,
+                  })
+                }
+                allowNegative={false}
+              />
+            </Group>
+          </div>
+
           <Textarea
             label="Comment"
             placeholder="Add any notes or comments..."
@@ -164,56 +208,7 @@ const EditTransactionModal: React.FC<Props> = ({
             {...register("comment")}
           />
 
-          {/* Close Stock Values */}
-          <div>
-            <p className="text-sm font-medium mb-2">Close Stock Values</p>
-            <Group grow>
-              <NumberInput
-                label="FB4 Close"
-                placeholder="0"
-                min={0}
-                value={watch("fb4_close_stock") ?? undefined}
-                onChange={(val) =>
-                  setValue(
-                    "fb4_close_stock",
-                    typeof val === "number" ? val : undefined,
-                    { shouldValidate: true, shouldDirty: true },
-                  )
-                }
-                allowNegative={false}
-              />
-              <NumberInput
-                label="Plastic Close"
-                placeholder="0"
-                min={0}
-                value={watch("plastic_close_stock") ?? undefined}
-                onChange={(val) =>
-                  setValue(
-                    "plastic_close_stock",
-                    typeof val === "number" ? val : undefined,
-                    { shouldValidate: true, shouldDirty: true },
-                  )
-                }
-                allowNegative={false}
-              />
-              <NumberInput
-                label="Wood Close"
-                placeholder="0"
-                min={0}
-                value={watch("wood_close_stock") ?? undefined}
-                onChange={(val) =>
-                  setValue(
-                    "wood_close_stock",
-                    typeof val === "number" ? val : undefined,
-                    { shouldValidate: true, shouldDirty: true },
-                  )
-                }
-                allowNegative={false}
-              />
-            </Group>
-          </div>
-
-          {/* Transaction Info (Read-only) */}
+          {/* Read-only info */}
           <div
             style={{
               backgroundColor: "#f8f9fa",
@@ -222,66 +217,29 @@ const EditTransactionModal: React.FC<Props> = ({
               padding: "12px",
             }}
           >
-            <p className="text-sm font-medium mb-2 text-gray-600">
+            <Text fz="sm" fw={500} c="dimmed" mb={8}>
               Transaction Information (Read-only)
-            </p>
+            </Text>
             <Group grow>
               <div>
-                <p style={{ fontSize: "12px", color: "#6c757d" }}>Type</p>
-                <p style={{ fontSize: "14px", fontWeight: 500 }}>
-                  {transaction.t_type}
-                </p>
+                <Text fz="xs" c="dimmed">
+                  Chep ID
+                </Text>
+                <Text fz="sm" fw={500}>
+                  {transaction.chep_id}
+                </Text>
               </div>
               <div>
-                <p style={{ fontSize: "12px", color: "#6c757d" }}>Creator</p>
-                <p style={{ fontSize: "14px", fontWeight: 500 }}>
+                <Text fz="xs" c="dimmed">
+                  Creator
+                </Text>
+                <Text fz="sm" fw={500}>
                   {transaction.creator_id}
-                </p>
-              </div>
-            </Group>
-            <Group grow style={{ marginTop: "8px" }}>
-              <div>
-                <p style={{ fontSize: "12px", color: "#6c757d" }}>FB4 Total</p>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "#3b82f6",
-                  }}
-                >
-                  {transaction.total_fb4_stock.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p style={{ fontSize: "12px", color: "#6c757d" }}>
-                  Plastic Total
-                </p>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "#10b981",
-                  }}
-                >
-                  {transaction.total_plastic_stock.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p style={{ fontSize: "12px", color: "#6c757d" }}>Wood Total</p>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "#f59e0b",
-                  }}
-                >
-                  {transaction.total_wood_stock.toLocaleString()}
-                </p>
+                </Text>
               </div>
             </Group>
           </div>
 
-          {/* Action Buttons */}
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={onClose} disabled={isSubmitting}>
               Cancel

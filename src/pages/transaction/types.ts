@@ -39,7 +39,7 @@ export interface Transaction {
 
 export interface CreateTransactionPayload {
   chep_id: string;
-  t_type: 'inbound' | 'outbound';
+  t_type: "inbound" | "outbound" | "adjustment_inbound" | "adjustment_outbound";
   from_where: string;
   to_where: string;
   comment?: string;
@@ -62,10 +62,38 @@ export interface OpenStockPayload {
   stock_date: string;
 }
 
-
 export interface UpdateTransactionPayload extends Partial<CreateTransactionPayload> {
   uid: string;
 }
 
-// Write‑off payload (similar to create, but endpoint is different)
-export type WriteOffPayload = CreateTransactionPayload;
+export interface WriteOffPayload {
+  chep_id: string;
+  comment: string;
+  from_where: string;
+  to_where: string;
+  t_type: string;
+  fb4_stock: number;
+  plastic_stock: number;
+  wood_stock: number;
+  stock_date: string;
+}
+
+export interface StockLog {
+  admin: string;
+  message: string;
+  create_at: string;
+}
+
+export interface StockDetails {
+  uid: string;
+  active: boolean;
+  fb4_stock: number;
+  plastic_stock: number;
+  wood_stock: number;
+  total_fb4_write_off_stock: number;
+  total_plastic_write_off_stock: number;
+  total_wood_write_off_stock: number;
+  stock_date: string;
+  logs: StockLog[];
+  create_at: string;
+}

@@ -10,30 +10,14 @@ import {
   Text,
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
-import { Transaction } from "../types";
+import { Transaction, WriteOffPayload } from "../types";
 
 interface WriteOffFormValues {
-  chep_id: string;
-  comment: string;
-  from_where: string;
-  to_where: string;
-  t_type: string;
   fb4_stock: number;
   plastic_stock: number;
   wood_stock: number;
-  stock_date: Date | null;
-}
-
-export interface WriteOffPayload {
-  chep_id: string;
+  stock_date: Date | null; // This remains a Date object for the UI component
   comment: string;
-  from_where: string;
-  to_where: string;
-  t_type: string;
-  fb4_stock: number;
-  plastic_stock: number;
-  wood_stock: number;
-  stock_date: string;
 }
 
 interface Props {
@@ -56,21 +40,28 @@ const WriteOffModal: React.FC<Props> = ({
     watch,
     reset,
     formState: { isSubmitting },
-  } = useForm<WriteOffFormValues>();
+  } = useForm<WriteOffFormValues>({
+    defaultValues: {
+      fb4_stock: 0,
+      plastic_stock: 0,
+      wood_stock: 0,
+      stock_date: new Date(),
+      comment: "",
+    },
+  });
 
   useEffect(() => {
     if (transaction && opened) {
+      // Ensure we convert the string from API to a Date object here
+      const initialDate = transaction.stock_date
+        ? new Date(transaction.stock_date)
+        : new Date();
+
       reset({
-        chep_id: transaction.chep_id,
-        from_where: transaction.from_where,
-        to_where: transaction.to_where,
-        t_type: transaction.t_type,
-        fb4_stock: transaction.total_fb4_stock,
-        plastic_stock: transaction.total_plastic_stock,
-        wood_stock: transaction.total_wood_stock,
-        stock_date: transaction.stock_date
-          ? new Date(transaction.stock_date)
-          : null,
+        fb4_stock: transaction.total_fb4_stock ?? 0,
+        plastic_stock: transaction.total_plastic_stock ?? 0,
+        wood_stock: transaction.total_wood_stock ?? 0,
+        stock_date: isNaN(initialDate.getTime()) ? new Date() : initialDate,
         comment: "",
       });
     }
@@ -78,13 +69,18 @@ const WriteOffModal: React.FC<Props> = ({
 
   const submitHandler = handleSubmit(async (data) => {
     const payload: WriteOffPayload = {
-      ...data,
-      stock_date: data.stock_date
-        ? data.stock_date.toISOString()
-        : new Date().toISOString(),
+      chep_id: transaction.chep_id,
+      from_where: transaction.from_where,
+      to_where: transaction.to_where,
+      t_type: "write_off",
       fb4_stock: Number(data.fb4_stock),
       plastic_stock: Number(data.plastic_stock),
       wood_stock: Number(data.wood_stock),
+      // Convert Date object back to ISO string for the backend
+      stock_date: data.stock_date
+        ? data.stock_date.toISOString()
+        : new Date().toISOString(),
+      comment: data.comment,
     };
 
     await onSubmit(payload);
@@ -97,7 +93,7 @@ const WriteOffModal: React.FC<Props> = ({
       title={<Text fw={600}>Write Off</Text>}
       centered
       size="md"
-      overlayProps={{ opacity: 0.55, blur: 3 }}
+      overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
     >
       <form onSubmit={submitHandler}>
         <Stack gap="md">
@@ -118,33 +114,27 @@ const WriteOffModal: React.FC<Props> = ({
             <NumberInput
               label="FB4"
               min={0}
-              value={watch("fb4_stock") ?? 0}
+              value={watch("fb4_stock")}
               onChange={(val) =>
-                setValue("fb4_stock", typeof val === "number" ? val : 0, {
-                  shouldDirty: true,
-                })
+                setValue("fb4_stock", Number(val), { shouldDirty: true })
               }
               allowNegative={false}
             />
             <NumberInput
               label="Plastic"
               min={0}
-              value={watch("plastic_stock") ?? 0}
+              value={watch("plastic_stock")}
               onChange={(val) =>
-                setValue("plastic_stock", typeof val === "number" ? val : 0, {
-                  shouldDirty: true,
-                })
+                setValue("plastic_stock", Number(val), { shouldDirty: true })
               }
               allowNegative={false}
             />
             <NumberInput
               label="Wood"
               min={0}
-              value={watch("wood_stock") ?? 0}
+              value={watch("wood_stock")}
               onChange={(val) =>
-                setValue("wood_stock", typeof val === "number" ? val : 0, {
-                  shouldDirty: true,
-                })
+                setValue("wood_stock", Number(val), { shouldDirty: true })
               }
               allowNegative={false}
             />

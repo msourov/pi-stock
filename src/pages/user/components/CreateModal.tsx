@@ -3,13 +3,11 @@ import {
   TextInput,
   PasswordInput,
   Select,
-  Checkbox,
   Group,
   Button,
+  Text,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { useCompanyBranchOptions } from "../../../hooks/useCompanyBranch";
-import { useEffect } from "react";
 import { notifications } from "@mantine/notifications";
 import { CreateUserPayload } from "../type";
 
@@ -35,163 +33,139 @@ export const CreateUserModal = ({
 }: CreateUserModalProps) => {
   const form = useForm({
     initialValues: {
-      user_id: "",
       name: "",
+      user_id: "",
       email: "",
-      mobile_number: "",
       password: "",
       confirmPassword: "",
-      company_id: "",
-      branch_id: "",
       role_id: "",
-      company_admin: false,
-      active: true,
     },
+
     validate: {
       name: (value) =>
         value.trim().length < 2 ? "Name must be at least 2 characters" : null,
-      email: (value) => (/^\S+@\S+$/.test(value) ? null : "Invalid email"),
-      mobile_number: (value) =>
-        value.trim().length < 10 ? "Invalid phone number" : null,
       user_id: (value) => (value.trim().length ? null : "User ID is required"),
+      email: (value) =>
+        /^\S+@\S+$/.test(value) ? null : "Invalid email format",
+      role_id: (value) => (value ? null : "Please select a role"),
       password: (value) =>
         value.length < 6 ? "Password must be at least 6 characters" : null,
       confirmPassword: (value, values) =>
         value !== values.password ? "Passwords do not match" : null,
-      company_id: (value) => (value ? null : "Please select a company"),
-      branch_id: (value) => (value ? null : "Please select a branch"),
-      role_id: (value) => (value ? null : "Please select a role"),
     },
   });
 
-  const { companyOptions, branchOptions, getBranchesByCompany } =
-    useCompanyBranchOptions();
-
   const handleSubmit = async (values: typeof form.values) => {
-    if (values.password !== values.confirmPassword) {
+    const payload = {
+      name: values.name,
+      user_id: values.user_id,
+      email: values.email,
+      password: values.password,
+      role_id: values.role_id,
+      department: "Logistics",
+      active: true,
+    };
+
+    try {
+      const success = await onSubmit(payload);
+
+      if (success) {
+        notifications.show({
+          title: "Success",
+          message: "User account created successfully!",
+          color: "green",
+          position: "top-right",
+        });
+        form.reset();
+        onClose();
+      }
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "An error occurred";
       notifications.show({
-        title: "Password mismatch",
-        message: "Passwords do not match. Please recheck.",
+        title: "Error",
+        message: errorMessage,
         color: "red",
       });
-      return;
     }
-
-    const { confirmPassword, ...payload } = values;
-    console.log(confirmPassword);
-    const success = await onSubmit(payload);
-    if (success) form.reset();
   };
 
-  useEffect(() => {
-    getBranchesByCompany(form.values.company_id);
-  }, [form.values.company_id]);
+  // Determine if the button should be disabled based on validation state
+  const isInvalid = !form.isValid();
 
   return (
     <Modal
       opened={opened}
       onClose={onClose}
-      title={<p className="font-semibold">Create New User</p>}
-      size="lg"
+      title={
+        <Text fw={600} size="lg">
+          Create New User
+        </Text>
+      }
+      size="md"
       centered
+      overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
-        {/* --- Basic Info --- */}
         <TextInput
           label="Full Name"
-          placeholder="Enter full name"
+          placeholder="Enter name"
           required
           {...form.getInputProps("name")}
-          mb="md"
-        />
-
-        <TextInput
-          label="Email"
-          placeholder="Enter email address"
-          required
-          {...form.getInputProps("email")}
-          mb="md"
-        />
-
-        <TextInput
-          label="Mobile Number"
-          placeholder="Enter mobile number"
-          required
-          {...form.getInputProps("mobile_number")}
-          mb="md"
+          mb="sm"
         />
 
         <TextInput
           label="User ID"
-          placeholder="Enter user ID"
+          placeholder="unique_username"
           required
           {...form.getInputProps("user_id")}
-          mb="md"
+          mb="sm"
         />
 
-        {/* --- Organization Info --- */}
-        <Select
-          label="Company"
-          placeholder="Select company"
-          data={companyOptions}
+        <TextInput
+          label="Email"
+          placeholder="user@company.com"
           required
-          {...form.getInputProps("company_id")}
-          mb="md"
-        />
-
-        <Select
-          label="Branch"
-          placeholder="Select branch"
-          data={branchOptions}
-          required
-          disabled={!form.values.company_id}
-          {...form.getInputProps("branch_id")}
-          mb="md"
+          {...form.getInputProps("email")}
+          mb="sm"
         />
 
         <Select
           label="Role"
-          placeholder="Select role"
+          placeholder="Pick one"
           data={roleOptions}
           required
           {...form.getInputProps("role_id")}
-          mb="md"
+          mb="sm"
         />
 
-        {/* --- Account Settings --- */}
         <PasswordInput
           label="Password"
-          placeholder="Enter password"
+          placeholder="Minimum 6 characters"
           required
           {...form.getInputProps("password")}
-          mb="md"
+          mb="sm"
         />
 
         <PasswordInput
           label="Confirm Password"
-          placeholder="Confirm password"
+          placeholder="Repeat password"
           required
           {...form.getInputProps("confirmPassword")}
-          mb="md"
+          mb="xl"
         />
 
-        <Group grow mb="xl">
-          <Checkbox
-            label="Company Admin"
-            {...form.getInputProps("company_admin", { type: "checkbox" })}
-          />
-          <Checkbox
-            label="Active User"
-            {...form.getInputProps("active", { type: "checkbox" })}
-          />
-        </Group>
-
-        {/* --- Actions --- */}
         <Group justify="flex-end">
-          <Button variant="light" onClick={onClose}>
+          <Button variant="default" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button
+            type="submit"
+            loading={loading}
+            disabled={isInvalid}
+            color="blue"
+          >
             Create User
           </Button>
         </Group>

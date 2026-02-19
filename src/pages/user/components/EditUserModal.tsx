@@ -1,8 +1,17 @@
-import { Modal, TextInput, Select, Switch, Button, Group } from "@mantine/core";
+import {
+  Modal,
+  TextInput,
+  Select,
+  Switch,
+  Button,
+  Group,
+  Text,
+  Stack,
+} from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useEffect } from "react";
+import { notifications } from "@mantine/notifications";
 import { UpdateUserPayload, User } from "../type";
-import { useCompanyBranchOptions } from "../../../hooks/useCompanyBranch";
 
 interface EditUserModalProps {
   opened: boolean;
@@ -26,142 +35,126 @@ export const EditUserModal = ({
       uid: "",
       name: "",
       email: "",
-      mobile_number: "",
-      role: "",
-      company_id: "",
-      branch_id: "",
-      company_admin: false,
+      role_id: "",
       active: true,
     },
     validate: {
       name: (value) =>
         value.trim().length < 2 ? "Name must be at least 2 characters" : null,
       email: (value) => (/^\S+@\S+$/.test(value) ? null : "Invalid email"),
-      mobile_number: (value) =>
-        value.trim().length < 10 ? "Invalid phone number" : null,
-      role: (value) => (value ? null : "Please select a role"),
-      company_id: (value) => (value ? null : "Please select a company"),
-      branch_id: (value) => (value ? null : "Please select a branch"),
+      role_id: (value) => (value ? null : "Please select a role"),
     },
   });
 
-  const { companyOptions, getBranchesByCompany } = useCompanyBranchOptions();
-
   useEffect(() => {
-    if (user) {
+    if (user && opened) {
       form.setValues({
         uid: user.uid,
         name: user.name,
         email: user.email,
-        mobile_number: user.mobile_number,
-        role: user.role_id,
-        company_id: user.company_id,
-        branch_id: "1234",
-        company_admin: true,
+        role_id: user.role_id,
         active: user.active,
       });
+      form.resetDirty();
     }
-  }, [user]);
+  }, [user, opened]);
 
   const handleSubmit = async (values: typeof form.values) => {
     if (!user) return;
 
-    const payload: UpdateUserPayload = {
-      uid: user.uid,
+    const payload = {
+      uid: values.uid,
       name: values.name,
       email: values.email,
-      mobile_number: values.mobile_number,
-      role: values.role,
-      company_id: values.company_id,
-      branch_id: values.branch_id,
-      company_admin: values.company_admin,
+      role_id: values.role_id,
+      department: "Logistics",
       active: values.active,
     };
 
-    const success = await onSubmit(user.uid, payload);
-    if (success) form.reset();
+    try {
+      const success = await onSubmit(user.uid, payload);
+      if (success) {
+        notifications.show({
+          title: "User Updated",
+          message: "The user details have been saved successfully.",
+          color: "green",
+          position: "top-right",
+        });
+        onClose();
+      }
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update user";
+      notifications.show({
+        title: "Error",
+        message: errorMessage,
+        color: "red",
+      });
+    }
   };
+
+  // Button is disabled if validation fails OR if no changes were made
+  const isInvalid = !form.isValid();
+  const isNotDirty = !form.isDirty();
 
   return (
     <Modal
       opened={opened}
       onClose={onClose}
-      title={<p className="font-semibold">Edit User</p>}
-      size="lg"
+      title={
+        <Text fw={600} size="lg">
+          Edit User Profile
+        </Text>
+      }
+      size="md"
       centered
+      overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
-        <TextInput
-          label="Full Name"
-          placeholder="Enter full name"
-          required
-          {...form.getInputProps("name")}
-          mb="md"
-        />
+        <Stack gap="sm">
+          <TextInput
+            label="Full Name"
+            placeholder="John Doe"
+            required
+            {...form.getInputProps("name")}
+          />
 
-        <TextInput
-          label="Email"
-          placeholder="Enter email address"
-          required
-          {...form.getInputProps("email")}
-          mb="md"
-        />
+          <TextInput
+            label="Email"
+            placeholder="example@company.com"
+            required
+            {...form.getInputProps("email")}
+          />
 
-        <TextInput
-          label="Mobile Number"
-          placeholder="Enter mobile number"
-          required
-          {...form.getInputProps("mobile_number")}
-          mb="md"
-        />
+          <Select
+            label="Role"
+            placeholder="Select user role"
+            data={roleOptions}
+            required
+            {...form.getInputProps("role_id")}
+          />
 
-        <Select
-          label="Company"
-          placeholder="Select company"
-          data={companyOptions}
-          required
-          {...form.getInputProps("company_id")}
-          mb="md"
-        />
+          <Switch
+            label="Active"
+            // description="Toggle to enable or disable user access"
+            {...form.getInputProps("active", { type: "checkbox" })}
+            mt="md"
+          />
 
-        <Select
-          label="Branch"
-          placeholder="Select branch"
-          // data={branchOptions}
-          required
-          {...form.getInputProps("branch_id")}
-          mb="md"
-        />
-
-        <Select
-          label="Role"
-          placeholder="Select role"
-          required
-          data={roleOptions}
-          {...form.getInputProps("role")}
-          mb="md"
-        />
-
-        <Switch
-          label="Company Admin"
-          {...form.getInputProps("company_admin", { type: "checkbox" })}
-          mb="sm"
-        />
-
-        <Switch
-          label="Active User"
-          {...form.getInputProps("active", { type: "checkbox" })}
-          mb="xl"
-        />
-
-        <Group justify="flex-end">
-          <Button variant="light" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={loading}>
-            Update User
-          </Button>
-        </Group>
+          <Group justify="flex-end" mt="xl">
+            <Button variant="default" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              loading={loading}
+              disabled={isInvalid || isNotDirty}
+              color="blue"
+            >
+              Update User
+            </Button>
+          </Group>
+        </Stack>
       </form>
     </Modal>
   );
